@@ -1,19 +1,22 @@
 #text file handling
 
-TxtFindFirst <- function(filename,value){ # return the indexes of the value found at first
-  data <- read.table(filename) # read the text file
+TxtFindFirst <- function(filename,value,delimiter){ # return the indexes of the value found at first
+  data <- read.table(filename,sep=delimiter) # read the text file
   for (j in 1:ncol(data)){
     for (i in 1:nrow(data)){
-      if(data[i,j] == value) # if found, store indexes
-        return(c(i,j))
+      if(data[i,j] == value){# if found, store indexes
+        Result <- c(i,j)
+        names(Result) <- c("Row","Column")
+        return(Result)
+      } 
     }
   }
   cat(value,"is not found!\n")
   return(-1)
 }
 
-TxtFindAll <- function(filename,value){ # return the indexes of the value found everywhere
-  data <- read.table(filename) # read the text file
+TxtFindAll <- function(filename,value,delimiter){ # return the indexes of the value found everywhere
+  data <- read.table(filename,sep=delimiter) # read the text file
   n <- 1 # initialize a variable for indexing
   rows <- 0 # declare this in order to store row indexes
   cols <- 0 # declare this in order to store column indexes
@@ -33,11 +36,12 @@ TxtFindAll <- function(filename,value){ # return the indexes of the value found 
   cat(value,"found at\n")
   Result <- c(rows,cols) # bound together as one dimensional vector
   dim(Result) <- c(n-1,2) # to give the final shape
+  colnames(Result) <- c("Row","Column") # assign column names
   return(Result)
 }
 
-TxtEditRow <- function(filename,rowindex,newvalue){ # edit a complete row, return edited data
-  data <- read.table(filename) # read the text file
+TxtEditRow <- function(filename,rowindex,newvalue,delimiter){ # edit a complete row, return edited data
+  data <- read.table(filename,sep=delimiter) # read the text file
   if(ncol(data) != length(newvalue)){ # do nothing if incorrect dimensions
     cat("It should have",ncol(data),"columns.")
     return (-1)
@@ -51,8 +55,8 @@ TxtEditRow <- function(filename,rowindex,newvalue){ # edit a complete row, retur
   }
 }
 
-TxtSort <- function(filename,colindex){ # descending order, with respect to chosen column
-  data <- read.table(filename) # read the text file
+TxtSort <- function(filename,colindex,delimiter){ # descending order, with respect to chosen column
+  data <- read.table(filename,sep=delimiter) # read the text file
   Result <- data # back up the content
   rows <- nrow(data) # store the number of elements in that column
   # Bubble sort algorithm starts
@@ -88,8 +92,8 @@ TxtConcatenate <- function(filename1,filename2){
 }
 
 #main
-print(TxtFindFirst("mysample2.txt",2))
-print(TxtFindAll("mysample2.txt",2))
-print(TxtEditRow("mysample2.txt",24,c(123,123,123)))
-print(TxtSort("mysample2.txt",1))
-print(TxtConcatenate("mysample.txt","mysample2.txt"))
+# print(TxtFindFirst("mysample2.txt",2,"\t"))
+# print(TxtFindAll("mysample2.txt",2,"\t")) # "\t" could be used instead of ""
+# print(TxtEditRow("mysample2.txt",24,c(123,123,123),"\t"))
+# print(TxtSort("mysample2.txt",1,"\t"))
+# print(TxtConcatenate("mysample.txt","mysample2.txt"))

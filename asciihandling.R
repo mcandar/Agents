@@ -8,7 +8,7 @@ TxtFindFirst <- function(filename,value){ # return the indexes of the value foun
         return(c(i,j))
     }
   }
-  cat(value,"is not found!")
+  cat(value,"is not found!\n")
   return(-1)
 }
 
@@ -27,7 +27,7 @@ TxtFindAll <- function(filename,value){ # return the indexes of the value found 
     }
   }
   if(n==1){
-    cat(value,"is not found!")
+    cat(value,"is not found!\n")
     return(-1)
   }
   cat(value,"found at\n")

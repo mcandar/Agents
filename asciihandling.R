@@ -48,9 +48,13 @@ TxtEditRow <- function(filename,rowindex,newvalue,delimiter){ # edit a complete 
   }
   else{
     Result <- data # back up the content
-    print(c("was : ",Result[rowindex,])) # use methods print and c instead of cat, to print a row
+    temp1 <- c("was : ",Result[rowindex,]) # define a temporary variable for better display
+    dim(temp1) <- c(1,ncol(Result)+1)
+    print(temp1)
     Result[rowindex,] <- newvalue # set new values
-    print(c("now : " ,Result[rowindex,]))
+    temp2 <- c("now : " ,Result[rowindex,])
+    dim(temp2) <- c(1,ncol(Result)+1)
+    print(temp2)
     return(Result)
   }
 }
@@ -77,9 +81,9 @@ TxtSort <- function(filename,colindex,delimiter){ # descending order, with respe
   return (Result)
 }
 
-TxtConcatenate <- function(filename1,filename2){
-  data1 <- read.table(filename1) # read the text file
-  data2 <- read.table(filename2)
+TxtConcatenate <- function(filename1,delimiter1,filename2,delimiter2){
+  data1 <- read.table(filename1,sep = delimiter1) # read the text file
+  data2 <- read.table(filename2,sep = delimiter2)
   if (ncol(data1) != ncol(data2)){ # do nothing if incorrect dimensions
     print("Dimensions must agree!")
   return (-1)
@@ -91,9 +95,9 @@ TxtConcatenate <- function(filename1,filename2){
   return (Result)
 }
 
-#main
+# main
 # print(TxtFindFirst("mysample2.txt",2,"\t"))
 # print(TxtFindAll("mysample2.txt",2,"\t")) # "\t" could be used instead of ""
 # print(TxtEditRow("mysample2.txt",24,c(123,123,123),"\t"))
 # print(TxtSort("mysample2.txt",1,"\t"))
-# print(TxtConcatenate("mysample.txt","mysample2.txt"))
+# print(TxtConcatenate("mysample.txt","\t","mysample2.txt","\t"))

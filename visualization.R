@@ -1,14 +1,3 @@
-# PanoPlot <- function(input,amount,save){
-#   for (i in 1:amount){
-#     if(save)
-#       png(filename,width = 1366,height = 768)
-#     persp(input,theta = (360/amount)*i)#,xlab = "X", theta = -60,ylab = "Y", zlab = "Z",ticktype = "detailed")
-#     filename <- paste("mygraph_",i,".png",sep="")
-#     if(save)
-#       dev.off()
-#   }
-# }
-
 RV <- sample(10,100,replace = TRUE) # form a matrix full of random integers
 RM <- matrix(0,100,10) # declare and initialize a matrix to fill later, 100 rows, 10 columns
 
@@ -26,11 +15,10 @@ for (n in 1:10){
   }
   init <- 100 # reset at the end of the column
 }
-# PanoPlot(RM[,i],2,save = FALSE)
 
-png("mygraph1.png",width = 1366,height = 768)
-persp(RM,theta = -60)
-dev.off()
+png("mygraph1.png",width = 1366,height = 768) # turn on the image saver and create the image
+persp(RM,theta = -60) # draw the graph
+dev.off() # save it and turn the device off
 
 png("mygraph2.png",width = 1366,height = 768)
 persp(RM2,theta = -60)

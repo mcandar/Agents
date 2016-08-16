@@ -8,13 +8,20 @@ DetectTime <- function(data,col,format="%m/%d/%Y %H:%M:%S"){
   return(Result)
 }
 
-Convert <- function(data,col,na.rm=FALSE){ # unfactors and extracts the content out of it as numeric
+Convert <- function(data,col,class="numeric",na.rm=FALSE){ # unfactors and extracts the content out of it as numeric
   Result <- data
   for(i in col){ # split XXXXX-XXXX type of zip data, take the right-hand side
     m <- strsplit(as.character(Result[,i]),"-")
     n <- as.data.frame(matrix(lapply(m, "[",1)))
-    Result[,i] <- as.data.frame(n) # originally as.data.frame(trimws(n[[1]]))
-    Result[,i] <- as.numeric(as.character(Result[,i])) # originally Result$`Receipent Zip` instead of Result[,5]
+    Result[,i] <- as.data.frame(trimws(n[[1]]))
+    switch (class,
+      "numeric" = {
+        Result[,i] <- as.numeric(as.character(Result[,i])) # originally denoted as Result$`Receipent Zip`
+      },
+      "character" = {
+        Result[,i] <- as.character(Result[,i])
+      }
+    )
   }
   if(na.rm){ # remove NA rows and calculate the percentage
     oldr <- nrow(Result)

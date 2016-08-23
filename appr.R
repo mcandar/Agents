@@ -16,7 +16,7 @@ Name <- function(data,type = "sale.data"){
     },
     "shipping.data" = {
       colnames(data) <- c("TrackingNumber","Company","ShippingCode","SenderZip","ReceipentZip","Type",
-                          "Item Weight","SONumber","DateShipped","DateDelivered","Duration")
+                          "ItemWeight","SONumber","DateShipped","DateDelivered","Duration")
     }
   )
   return(data)

@@ -8,7 +8,6 @@
 ### - Istanbul, Turkey ---------------------------------------------------- ###
 ### ----------------------------------------------------------------------- ###
 
-# Import US postal codes from github
 GetZips <- function(){
   Zips <- read.table("https://raw.githubusercontent.com/mcandar/
                      Agents/master/US_Postal_Codes_Merged.txt",colClasses = "character")
@@ -20,7 +19,6 @@ Sort <- function(data,col){
   return(data[order(data[,col]),])
 }
 
-# Easily set column names
 SetColNames <- function(data,type = "sale.data"){
   switch (type,
     "sale.data" = {
@@ -61,9 +59,11 @@ Convert <- function(data,col,class="numeric",na.rm=FALSE,limupper = 10^20){ # un
   if(na.rm){ # remove NA rows and calculate the percentage
     oldr <- nrow(Result)
     Result <- na.omit(Result)
-    for(i in col){ # remove the incorrect zips, zip codes cannot be equal or greater than 10^5
-      if(any(Result[,i] > limupper))
-        Result <- Result[-which(Result[,i] > limupper),]
+    if(class == "numeric"){
+      for(i in col){ # remove the incorrect zips, zip codes cannot be equal or greater than 10^5
+        if(any(Result[,i] > limupper))
+          Result <- Result[-which(Result[,i] > limupper),]
+      }
     }
     newr <- nrow(Result)
     cat(((oldr-newr)/oldr)*100,"% of the rows are removed.\n",sep = "")
@@ -115,20 +115,22 @@ MultiPlot <- function(x,                    # data of x axis
 
 # Draw multiple higher quality graphs at one time with ggplot2, 
 MultiGGPlot <- function(x,                    # data of x axis
-                      data,                 # data set of y axis
-                      xlab = NULL,          # x label
-                      main = "GGPlot",      # main title
-                      fname = "GG_",        # prefix for filename
-                      geom = "jitter",      # geometry of the plot
-                      alpha = I(1/10),      # transparecy of the points
-                      width = 8,            # width as inches
-                      height = 4.5,         # height as inches
-                      extension = "png"){        
+                        data,                 # data set of y axis
+                        xlab = NULL,          # x label
+                        main = "GGPlot",      # main title
+                        fname = "GG_",        # prefix for filename
+                        geom = "jitter",      # geometry of the plot
+                        alpha = I(1/10),      # transparecy of the points
+                        smooth = FALSE,       # de/activate smoothing
+                        smethod = "lm",       # smoothing method
+                        formula=y ~ poly(x, 3, raw=TRUE), # formula for smoothing, linear, polynomial etc.
+                        width = 8,            # width as inches
+                        height = 4.5){        # height as inches
   
   require(ggplot2)
   data <- as.data.frame(data)
   for(i in 1:ncol(data)){
-    filename <- paste(fname,"_",i,"_",colnames(data[i]),"_vs_",xlab,".",extension,sep = "") # form a file name with an index
+    filename <- paste(fname,"_",i,"_",colnames(data[i]),"_vs_",xlab,".png",sep = "") # form a file name with an index
     plotname <- paste(main," #",i,sep = "")
     ggplot(data, 
            aes(x = x,
@@ -143,10 +145,60 @@ MultiGGPlot <- function(x,                    # data of x axis
            x = xlab,
            y = colnames(data[i])) +
       
-      ggsave(filename,device = extension,width = width,height = height)
+      if(smooth)
+        geom_smooth(method=smethod, se=TRUE, fill=NA,
+                    formula=formula,colour="blue")
+    
+    ggsave(filename,device = "png",width = width,height = height)
     cat("Image",filename,"saved to",getwd(),"\n")
   }
   return (TRUE)
+}
+
+# Calculate the correlations and plot them in a table (content of the function is properly 
+# working outside the function, but function itself does not plot and save the graph.)
+CorLevels <- function(data,filename="Correlations",main = "Title"){
+  Result <- cor(data) # calculate correlation coefficients
+  Original <- Result
+  n <- 0 # initialize a variable for counting
+  while(range(abs(Result))[1]<0.1){ # if absolute value of the smallest value if less than 0.1
+    for(i in 1:nrow(Result)){         # take square roots of the data to rescale, until it can be
+      for(j in 1:nrow(Result)){       # easily observable
+        if(Result[i,j] < 0)
+          Result[i,j] <- (-1)*sqrt(abs(Result[i,j])) # sqrt the abs value and then multiply by minus one
+        else
+          Result[i,j] <- sqrt(Result[i,j]) # normally sqrt the value itself
+      }
+    }
+    n <- n + 1 # count the number of cycles
+  }
+  if(n>0) # warn the user about scaling
+    cat(n," times square root is taken (elementwise) for better scaling.\n",sep="")
+  require(lattice)
+  pdf(filename) # save following plot to a file with pdf format 
+  levelplot(Result,main = main) # plot levels with corresponding colors
+  dev.off() # turn the device off
+  return(Original) # return the original correlations matrix
+}
+
+# for quick arranging of Month10.txt and similars
+Format.SaleData <- function(data,na.rm = FALSE,ziplim = 10^5,solim = 10^9){
+  Result <- GetTime(data,2) # get time series
+  Result <- Convert(Result,c(3,4),na.rm = na.rm,limupper = ziplim) # filter zips
+  Result <- Convert(Result,1,na.rm = na.rm,limupper = solim) # filter SOnumbers
+  Result <- SetColNames(Result) # set column names
+  return(Result)
+}
+
+# for quick arranging of ShippingData_Months_10to12.txt and similars (check the commented line, it causes errors)
+Format.ShippingData <- function(data,na.rm = FALSE,ziplim = 10^5,solim = 2*(10^9),dulim = 1500){
+  Result <- GetTime(GetTime(data,9),10) # get time series
+  Result <- Convert(Result,c(4,5),na.rm = na.rm,limupper = ziplim) # filter zips
+  Result <- Convert(Result,8,na.rm = na.rm,limupper = solim) # filter SOnumbers
+  Result <- Convert(Result,c(7,11),na.rm = na.rm,limupper = dulim) # filter duration and one more
+  # Result <- Convert(Result,c(1,2,3,6),class = "character",na.rm = na.rm,limupper = solim) # filter SOnumbers
+  Result <- SetColNames(Result,type = "shipping.data") # set column names
+  return(Result)
 }
 
 ### ----------------------------------------------------------------------- ###

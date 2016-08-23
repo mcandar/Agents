@@ -8,6 +8,20 @@
 ### - Istanbul, Turkey ---------------------------------------------------- ###
 ### ----------------------------------------------------------------------- ###
 
+Name <- function(data,type = "sale.data"){
+  switch (type,
+    "sale.data" = {
+      colnames(data) <- c("SONumber","ShippingDate","SenderZip","ReceipentZip","ItemDescription","ItemWeight",
+                          "UnitsShipped","AverageUnitPrice")
+    },
+    "shipping.data" = {
+      colnames(data) <- c("TrackingNumber","Company","ShippingCode","SenderZip","ReceipentZip","Type",
+                          "Item Weight","SONumber","DateShipped","DateDelivered","Duration")
+    }
+  )
+  return(TRUE)
+}
+
 # Import time series into R
 GetTime <- function(data,col,format="%m/%d/%Y %H:%M:%S"){
   Result <- data # back up the data

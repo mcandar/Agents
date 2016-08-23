@@ -8,26 +8,35 @@
 ### - Istanbul, Turkey ---------------------------------------------------- ###
 ### ----------------------------------------------------------------------- ###
 
-DetectTime <- function(data,col,format="%m/%d/%Y %H:%M:%S"){
+# Import time series into R
+GetTime <- function(data,col,format="%m/%d/%Y %H:%M:%S"){
   Result <- data # back up the data
   Result[[col]] <- strptime(data[[col]],format=format) # convert date and time from characters
   return(Result)
 }
 
-Convert <- function(data,col,na.rm=FALSE){ # unfactors and extracts the content out of it as numeric
+# Convert classes of objects without loss of information
+Convert <- function(data,col,class="numeric",na.rm=FALSE,limupper = 10^5){ # unfactors and extracts the content out of it as numeric
   Result <- data
   for(i in col){ # split XXXXX-XXXX type of zip data, take the right-hand side
     m <- strsplit(as.character(Result[,i]),"-")
     n <- as.data.frame(matrix(lapply(m, "[",1)))
-    Result[,i] <- as.data.frame(n) # originally as.data.frame(trimws(n[[1]]))
-    Result[,i] <- as.numeric(as.character(Result[,i])) # originally Result$`Receipent Zip` instead of Result[,5]
+    Result[,i] <- as.data.frame(trimws(n[[1]]))
+    switch (class,
+            "numeric" = {
+              Result[,i] <- as.numeric(as.character(Result[,i])) # originally denoted as Result$`Receipent Zip`
+            },
+            "character" = {
+              Result[,i] <- as.character(Result[,i])
+            }
+    )
   }
   if(na.rm){ # remove NA rows and calculate the percentage
     oldr <- nrow(Result)
     Result <- na.omit(Result)
     for(i in col){ # remove the incorrect zips, zip codes cannot be equal or greater than 10^5
-      if(any(Result[,i] > 10^5))
-        Result <- Result[-which(Result[,i] > 10^5),]
+      if(any(Result[,i] > limupper))
+        Result <- Result[-which(Result[,i] > limupper),]
     }
     newr <- nrow(Result)
     cat(((oldr-newr)/oldr)*100,"% of the rows are removed.\n",sep = "")
@@ -35,20 +44,21 @@ Convert <- function(data,col,na.rm=FALSE){ # unfactors and extracts the content 
   return(Result)
 }
 
-MultiQPlot <- function(x,                    # data of x axis
-                       data,                 # data set of y axis
-                       labelx = "Index",     # x label
-                       main = "QuickPlot",   # main title
-                       fname = "GG_",        # prefix for filename
-                       geom = "jitter",      # geometry of the plot
-                       alpha = I(1/10),      # transparecy of the points
-                       width = 8,            # width as inches
-                       height = 4.5){        # height as inches
+# Draw multiple higher quality graphs at one time with ggplot2, 
+MultiPlot <- function(x,                    # data of x axis
+                      data,                 # data set of y axis
+                      xlab = NULL,          # x label
+                      main = "QuickPlot",   # main title
+                      fname = "GG_",        # prefix for filename
+                      geom = "jitter",      # geometry of the plot
+                      alpha = I(1/10),      # transparecy of the points
+                      width = 8,            # width as inches
+                      height = 4.5){        # height as inches
   
   require(ggplot2)
   data <- as.data.frame(data)
   for(i in 1:ncol(data)){
-    filename <- paste(fname,"_",i,"_",colnames(data[i]),"_vs_",labelx,".png",sep = "") # form a file name with an index
+    filename <- paste(fname,"_",i,"_",colnames(data[i]),"_vs_",xlab,".png",sep = "") # form a file name with an index
     plotname <- paste(main," #",i,sep = "")
     ggplot(data, 
            aes(x = x,
@@ -60,7 +70,7 @@ MultiQPlot <- function(x,                    # data of x axis
       ) +
       
       labs(title = main,
-           x = labelx,
+           x = xlab,
            y = colnames(data[i])) +
       
       ggsave(filename,device = "png",width = width,height = height)

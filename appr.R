@@ -19,7 +19,7 @@ Name <- function(data,type = "sale.data"){
                           "Item Weight","SONumber","DateShipped","DateDelivered","Duration")
     }
   )
-  return(TRUE)
+  return(data)
 }
 
 # Import time series into R
@@ -30,7 +30,7 @@ GetTime <- function(data,col,format="%m/%d/%Y %H:%M:%S"){
 }
 
 # Convert classes of objects without loss of information
-Convert <- function(data,col,class="numeric",na.rm=FALSE,limupper = 10^5){ # unfactors and extracts the content out of it as numeric
+Convert <- function(data,col,class="numeric",na.rm=FALSE,limupper = 10^20){ # unfactors and extracts the content out of it as numeric
   Result <- data
   for(i in col){ # split XXXXX-XXXX type of zip data, take the right-hand side
     m <- strsplit(as.character(Result[,i]),"-")
@@ -92,3 +92,6 @@ MultiPlot <- function(x,                    # data of x axis
   }
   return (TRUE)
 }
+
+# Zips <- read.table("https://raw.githubusercontent.com/mcandar/
+#                    Agents/master/US_Postal_Codes_Merged.txt",colClasses = "character")

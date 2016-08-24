@@ -116,7 +116,6 @@ MultiPlot <- function(x,                    # data of x axis
 # Draw multiple higher quality graphs at one time with ggplot2, 
 MultiGGPlot <- function(x,                    # data of x axis
                         data,                 # data set of y axis
-                        xlab = NULL,          # x label
                         main = "GGPlot",      # main title
                         fname = "GG_",        # prefix for filename
                         geom = "jitter",      # geometry of the plot
@@ -128,29 +127,33 @@ MultiGGPlot <- function(x,                    # data of x axis
                         height = 4.5){        # height as inches
   
   require(ggplot2)
-  data <- as.data.frame(data)
-  for(i in 1:ncol(data)){
-    filename <- paste(fname,"_",i,"_",colnames(data[i]),"_vs_",xlab,".png",sep = "") # form a file name with an index
-    plotname <- paste(main," #",i,sep = "")
-    ggplot(data, 
-           aes(x = x,
-               y = data[,i])) +
-      switch (geom,
-              "jitter" = {geom_jitter(alpha = alpha)},
-              "point" = {geom_point(alpha = alpha)},
-              "path" = {geom_path(alpha = alpha)}
-      ) +
+  if(is.null(colnames(x))) 
+    x <- as.data.frame(x) # convert to data frame if not already, (x maybe a multicolumn object too)
+  
+  for(j in 1:ncol(x)){ # 1 through total column number (originally 1:dim(x)[2])
+    for(i in 1:ncol(data)){
+      filename <- paste(fname,"_",i,"_",colnames(data[i]),"_vs_",colnames(x[j]),".png",sep = "") # form a file name with an index
+      plotname <- paste(main," #",i,sep = "")
+      ggplot(data, 
+             aes(x = x[,j],
+                 y = data[,i])) +
+        switch (geom,
+                "jitter" = {geom_jitter(alpha = alpha)},
+                "point" = {geom_point(alpha = alpha)},
+                "path" = {geom_path(alpha = alpha)}
+        ) +
+        
+        labs(title = main,
+             x = colnames(x[j]),
+             y = colnames(data[i])) +
+        
+        if(smooth)
+          geom_smooth(method=smethod, se=TRUE, fill=NA,
+                      formula=formula,colour="blue")
       
-      labs(title = main,
-           x = xlab,
-           y = colnames(data[i])) +
-      
-      if(smooth)
-        geom_smooth(method=smethod, se=TRUE, fill=NA,
-                    formula=formula,colour="blue")
-    
-    ggsave(filename,device = "png",width = width,height = height)
-    cat("Image",filename,"saved to",getwd(),"\n")
+      ggsave(filename,device = "png",width = width,height = height)
+      cat("Image",filename,"saved to",getwd(),"\n")
+    }
   }
   return (TRUE)
 }
@@ -190,13 +193,13 @@ Format.SaleData <- function(data,na.rm = FALSE,ziplim = 10^5,solim = 10^9){
   return(Result)
 }
 
-# for quick arranging of ShippingData_Months_10to12.txt and similars (check the commented line, it causes errors)
+# for quick arranging of ShippingData_Months_10to12.txt and similars
 Format.ShippingData <- function(data,na.rm = FALSE,ziplim = 10^5,solim = 2*(10^9),dulim = 1500){
   Result <- GetTime(GetTime(data,9),10) # get time series
   Result <- Convert(Result,c(4,5),na.rm = na.rm,limupper = ziplim) # filter zips
   Result <- Convert(Result,8,na.rm = na.rm,limupper = solim) # filter SOnumbers
   Result <- Convert(Result,c(7,11),na.rm = na.rm,limupper = dulim) # filter duration and one more
-  # Result <- Convert(Result,c(1,2,3,6),class = "character",na.rm = na.rm,limupper = solim) # filter SOnumbers
+  Result <- Convert(Result,c(1,2,3,6),class = "character",na.rm = na.rm,limupper = solim) # set rest as char
   Result <- SetColNames(Result,type = "shipping.data") # set column names
   return(Result)
 }

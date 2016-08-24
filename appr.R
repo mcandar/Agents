@@ -132,6 +132,7 @@ MultiGGPlot <- function(x,                    # data of x axis
   
   for(j in 1:ncol(x)){ # 1 through total column number (originally 1:dim(x)[2])
     for(i in 1:ncol(data)){
+      if (identical(x[,j],data[,i])) next()
       filename <- paste(fname,"_",i,"_",colnames(data[i]),"_vs_",colnames(x[j]),".png",sep = "") # form a file name with an index
       plotname <- paste(main," #",i,sep = "")
       ggplot(data, 
@@ -188,6 +189,7 @@ CorLevels <- function(data,filename="Correlations",main = "Title"){
 Format.SaleData <- function(data,na.rm = FALSE,ziplim = 10^5,solim = 10^9){
   Result <- GetTime(data,2) # get time series
   Result <- Convert(Result,c(3,4),na.rm = na.rm,limupper = ziplim) # filter zips
+  Result <- Convert(Result,c(6,7,8),na.rm = na.rm,limupper = ziplim) # filter weight,units,price
   Result <- Convert(Result,1,na.rm = na.rm,limupper = solim) # filter SOnumbers
   Result <- SetColNames(Result) # set column names
   return(Result)

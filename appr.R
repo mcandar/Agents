@@ -8,17 +8,22 @@
 ### - Istanbul, Turkey ---------------------------------------------------- ###
 ### ----------------------------------------------------------------------- ###
 
+## Copy-paste following line to import the content directly from github ##
+source("https://raw.githubusercontent.com/mcandar/Agents/master/appr.R")
+
+# Get zip information from github, for mapping purposes
 GetZips <- function(){
   Zips <- read.table("https://raw.githubusercontent.com/mcandar/Agents/master/US_Postal_Codes_Merged.txt",
                      colClasses = "character")
   return(Zips)
 }
 
-# Row-wise sorting, ascending order
+# Row-wise sorting, ascending order. Just input data and column number you want to sort
 Sort <- function(data,col){
   return(data[order(data[,col]),])
 }
 
+# Easily set column names for both sale data (Month10.txt, etc.) and shipping data (Shipp..nths10to12.txt, etc)
 SetColNames <- function(data,type = "sale.data"){
   switch (type,
     "sale.data" = {
@@ -113,7 +118,7 @@ MultiPlot <- function(x,                    # data of x axis
   return (TRUE)
 }
 
-# Draw multiple higher quality graphs at one time with ggplot2, 
+# Draw multiple higher quality graphs with ggplot2, inputs can be multi-column data frames
 MultiGGPlot <- function(x,                    # data of x axis
                         data,                 # data set of y axis
                         main = "GGPlot",      # main title
@@ -180,6 +185,36 @@ Format.ShippingData <- function(data,na.rm = FALSE,ziplim = 10^5,solim = 2*(10^9
   return(Result)
 }
 
+# A quick solution for getting following data for each zip: location(city), lattitude, longtitude, amount of orders,
+# state code, total sold units and total received payments.
+LocationLevels <- function(data,zipcol,na.rm = FALSE){
+  ReceipentZips <- Convert(data,zipcol,class = "character")[,zipcol] # trim white spaces and convert to character for searching
+  ZipLevels <- levels(factor(unlist(ReceipentZips))) # determine how many different zips there are
+  ZipLevels <- as.data.frame(matrix(ZipLevels,length(ZipLevels),1)) # save the zips as one column matrix
+  
+  Result <- as.data.frame(matrix(NA,nrow(ZipLevels),8)) # form a new data frame to later fill in
+  Result[,2] <- ZipLevels
+  colnames(Result) <- c("Location","Zip Code","Lat","Lon","Order Amount","States Abb.","Total Units",
+                        "Total Payments")
+  
+  data$TotalPayments <- data[,7]*data[,8] # sum these as total payments and make it nineth column
+  
+  for (i in 1:nrow(Result)){ # get information from data
+    indexes <- which(ReceipentZips == Result[i,2]) # use which() to locate all zips
+    Result[i,c(5,7,8)] <- c(length(indexes),                     # Amount of orders
+                            sum(as.numeric(data[indexes,7])),  # Amount of shipped units
+                            sum(as.numeric(data[indexes,9])))  # Total price (should be multiplied by unit number)
+  }
+  
+  Zips <- GetZips()
+  for(i in 1:nrow(Result)){ # match and get information from zip database
+    if(is.na(Result[i,1]))
+      Result[i,c(1,6,3,4)] <- Zips[match(ZipLevels[i,1],Zips[,1]),c(2,4,6,7)] # Match the data such as city, lat, lon
+  }
+  if(na.rm) Result <- na.omit(Result)
+  return(Result) 
+}
+
 # Calculate the correlations and plot them in a table (content of the function is properly 
 # working outside the function, but function itself does not plot and save the graph.)
 CorLevels <- function(data,filename="Correlations",main = "Title"){
@@ -206,45 +241,45 @@ CorLevels <- function(data,filename="Correlations",main = "Title"){
   return(Original) # return the original correlations matrix
 }
 
-# Following Function is INCOMPLETE and NOT working. Should be reorganized.
-MultiPlotly3d <- function(data,
-                          x,
-                          y,
-                          z,
-                          color,
-                          fname = "3d",
-                          main = "3dPlot",
-                          type = "scatter3d", 
-                          mode = "markers"){
-  
-  require(plotly)
-  if(is.null(colnames(x)))
-    x <- as.data.frame(x) # convert to data frame if not already, (x maybe a multicolumn object too)
-  if(is.null(colnames(y)))
-    y <- as.data.frame(y) # convert to data frame if not already, (x maybe a multicolumn object too)
-  
-  # for(i in 1:ncol(z)){
-  filename <- paste(fname,"_",i,"_",
-                    colnames(x[1]),"_",
-                    colnames(y[1]),"_",
-                    colnames(z[i]),".html",sep = "") # form a file name with an index
-  
-  plotname <- paste(main," #",i,sep = "")
-  
-  p <- plot_ly(data, x = x, y = y, z = z[,i],
-               color = t, 
-               type = "scatter3d", 
-               mode = "markers") %>% 
-    layout(title = plotname,
-           scene = list(
-             xaxis = list(title = colnames(x[1])), 
-             yaxis = list(title = colnames(y[1])), 
-             zaxis = list(title = colnames(z[i]))))
-  htmlwidgets::saveWidget(as.widget(p), filename) # save as an html page to keep interactive tools
-  cat("Image",filename,"saved to",getwd(),"\n")
-  # }
-  return(p)
-}
+# # Following function is INCOMPLETE and NOT working. Should be reorganized.
+# MultiPlotly3d <- function(data,
+#                           x,
+#                           y,
+#                           z,
+#                           color,
+#                           fname = "3d",
+#                           main = "3dPlot",
+#                           type = "scatter3d", 
+#                           mode = "markers"){
+#   
+#   require(plotly)
+#   if(is.null(colnames(x)))
+#     x <- as.data.frame(x) # convert to data frame if not already, (x maybe a multicolumn object too)
+#   if(is.null(colnames(y)))
+#     y <- as.data.frame(y) # convert to data frame if not already, (x maybe a multicolumn object too)
+#   
+#   # for(i in 1:ncol(z)){
+#   filename <- paste(fname,"_",i,"_",
+#                     colnames(x[1]),"_",
+#                     colnames(y[1]),"_",
+#                     colnames(z[i]),".html",sep = "") # form a file name with an index
+#   
+#   plotname <- paste(main," #",i,sep = "")
+#   
+#   p <- plot_ly(data, x = x, y = y, z = z[,i],
+#                color = t, 
+#                type = "scatter3d", 
+#                mode = "markers") %>% 
+#     layout(title = plotname,
+#            scene = list(
+#              xaxis = list(title = colnames(x[1])), 
+#              yaxis = list(title = colnames(y[1])), 
+#              zaxis = list(title = colnames(z[i]))))
+#   htmlwidgets::saveWidget(as.widget(p), filename) # save as an html page to keep interactive tools
+#   cat("Image",filename,"saved to",getwd(),"\n")
+#   # }
+#   return(p)
+# }
 
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###

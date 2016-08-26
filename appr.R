@@ -9,8 +9,8 @@
 ### ----------------------------------------------------------------------- ###
 
 GetZips <- function(){
-  Zips <- read.table("https://raw.githubusercontent.com/mcandar/
-                     Agents/master/US_Postal_Codes_Merged.txt",colClasses = "character")
+  Zips <- read.table("https://raw.githubusercontent.com/mcandar/Agents/master/US_Postal_Codes_Merged.txt",
+                     colClasses = "character")
   return(Zips)
 }
 
@@ -159,6 +159,27 @@ MultiGGPlot <- function(x,                    # data of x axis
   return (TRUE)
 }
 
+# for quick arranging of Month10.txt and similars
+Format.SaleData <- function(data,na.rm = FALSE,ziplim = 10^5,solim = 10^9){
+  Result <- GetTime(data,2) # get time series
+  Result <- Convert(Result,c(3,4),na.rm = na.rm,limupper = ziplim) # filter zips
+  Result <- Convert(Result,c(6,7,8),na.rm = na.rm,limupper = ziplim) # filter weight,units,price
+  Result <- Convert(Result,1,na.rm = na.rm,limupper = solim) # filter SOnumbers
+  Result <- SetColNames(Result) # set column names
+  return(Result)
+}
+
+# for quick arranging of ShippingData_Months_10to12.txt and similars
+Format.ShippingData <- function(data,na.rm = FALSE,ziplim = 10^5,solim = 2*(10^9),dulim = 1500){
+  Result <- GetTime(GetTime(data,9),10) # get time series
+  Result <- Convert(Result,c(4,5),na.rm = na.rm,limupper = ziplim) # filter zips
+  Result <- Convert(Result,8,na.rm = na.rm,limupper = solim) # filter SOnumbers
+  Result <- Convert(Result,c(7,11),na.rm = na.rm,limupper = dulim) # filter duration and one more
+  Result <- Convert(Result,c(1,2,3,6),class = "character",na.rm = na.rm,limupper = solim) # set rest as char
+  Result <- SetColNames(Result,type = "shipping.data") # set column names
+  return(Result)
+}
+
 # Calculate the correlations and plot them in a table (content of the function is properly 
 # working outside the function, but function itself does not plot and save the graph.)
 CorLevels <- function(data,filename="Correlations",main = "Title"){
@@ -185,25 +206,44 @@ CorLevels <- function(data,filename="Correlations",main = "Title"){
   return(Original) # return the original correlations matrix
 }
 
-# for quick arranging of Month10.txt and similars
-Format.SaleData <- function(data,na.rm = FALSE,ziplim = 10^5,solim = 10^9){
-  Result <- GetTime(data,2) # get time series
-  Result <- Convert(Result,c(3,4),na.rm = na.rm,limupper = ziplim) # filter zips
-  Result <- Convert(Result,c(6,7,8),na.rm = na.rm,limupper = ziplim) # filter weight,units,price
-  Result <- Convert(Result,1,na.rm = na.rm,limupper = solim) # filter SOnumbers
-  Result <- SetColNames(Result) # set column names
-  return(Result)
-}
-
-# for quick arranging of ShippingData_Months_10to12.txt and similars
-Format.ShippingData <- function(data,na.rm = FALSE,ziplim = 10^5,solim = 2*(10^9),dulim = 1500){
-  Result <- GetTime(GetTime(data,9),10) # get time series
-  Result <- Convert(Result,c(4,5),na.rm = na.rm,limupper = ziplim) # filter zips
-  Result <- Convert(Result,8,na.rm = na.rm,limupper = solim) # filter SOnumbers
-  Result <- Convert(Result,c(7,11),na.rm = na.rm,limupper = dulim) # filter duration and one more
-  Result <- Convert(Result,c(1,2,3,6),class = "character",na.rm = na.rm,limupper = solim) # set rest as char
-  Result <- SetColNames(Result,type = "shipping.data") # set column names
-  return(Result)
+# Following Function is INCOMPLETE and NOT working. Should be reorganized.
+MultiPlotly3d <- function(data,
+                          x,
+                          y,
+                          z,
+                          color,
+                          fname = "3d",
+                          main = "3dPlot",
+                          type = "scatter3d", 
+                          mode = "markers"){
+  
+  require(plotly)
+  if(is.null(colnames(x)))
+    x <- as.data.frame(x) # convert to data frame if not already, (x maybe a multicolumn object too)
+  if(is.null(colnames(y)))
+    y <- as.data.frame(y) # convert to data frame if not already, (x maybe a multicolumn object too)
+  
+  # for(i in 1:ncol(z)){
+  filename <- paste(fname,"_",i,"_",
+                    colnames(x[1]),"_",
+                    colnames(y[1]),"_",
+                    colnames(z[i]),".html",sep = "") # form a file name with an index
+  
+  plotname <- paste(main," #",i,sep = "")
+  
+  p <- plot_ly(data, x = x, y = y, z = z[,i],
+               color = t, 
+               type = "scatter3d", 
+               mode = "markers") %>% 
+    layout(title = plotname,
+           scene = list(
+             xaxis = list(title = colnames(x[1])), 
+             yaxis = list(title = colnames(y[1])), 
+             zaxis = list(title = colnames(z[i]))))
+  htmlwidgets::saveWidget(as.widget(p), filename) # save as an html page to keep interactive tools
+  cat("Image",filename,"saved to",getwd(),"\n")
+  # }
+  return(p)
 }
 
 ### ----------------------------------------------------------------------- ###

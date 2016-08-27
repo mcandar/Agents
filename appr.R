@@ -9,7 +9,7 @@
 ### ----------------------------------------------------------------------- ###
 
 ## Copy-paste following line to import the content directly from github ##
-source("https://raw.githubusercontent.com/mcandar/Agents/master/appr.R")
+# source("https://raw.githubusercontent.com/mcandar/Agents/master/appr.R")
 
 # Get zip information from github, for mapping purposes
 GetZips <- function(){
@@ -41,7 +41,9 @@ SetColNames <- function(data,type = "sale.data"){
 # Import time series into R
 GetTime <- function(data,col,format="%m/%d/%Y %H:%M:%S"){
   Result <- data # back up the data
-  Result[[col]] <- strptime(data[[col]],format=format) # convert date and time from characters
+  # Result[[col]] <- strptime(data[[col]],format=format) # convert date and time from characters
+  for (i in col)
+    Result[[i]] <- strptime(data[[i]],format=format) # convert date and time from characters
   return(Result)
 }
 
@@ -187,7 +189,7 @@ Format.ShippingData <- function(data,na.rm = FALSE,ziplim = 10^5,solim = 2*(10^9
 
 # A quick solution for getting following data for each zip: location(city), lattitude, longtitude, amount of orders,
 # state code, total sold units and total received payments.
-LocationLevels <- function(data,zipcol,na.rm = FALSE){
+LocationLevels <- function(data,zipcol){
   ReceipentZips <- Convert(data,zipcol,class = "character")[,zipcol] # trim white spaces and convert to character for searching
   ZipLevels <- levels(factor(unlist(ReceipentZips))) # determine how many different zips there are
   ZipLevels <- as.data.frame(matrix(ZipLevels,length(ZipLevels),1)) # save the zips as one column matrix
@@ -198,20 +200,26 @@ LocationLevels <- function(data,zipcol,na.rm = FALSE){
                         "Total Payments")
   
   data$TotalPayments <- data[,7]*data[,8] # sum these as total payments and make it nineth column
-  
+  cat("Initialization completed.\n")
   for (i in 1:nrow(Result)){ # get information from data
     indexes <- which(ReceipentZips == Result[i,2]) # use which() to locate all zips
     Result[i,c(5,7,8)] <- c(length(indexes),                     # Amount of orders
                             sum(as.numeric(data[indexes,7])),  # Amount of shipped units
                             sum(as.numeric(data[indexes,9])))  # Total price (should be multiplied by unit number)
+    # progress bar as percentage
+    if(i %% as.integer(nrow(Result)/100) == 0) cat("=",sep="")
   }
+  cat("\nSummations completed.\n")
   
-  Zips <- GetZips()
+  if(!exists("Zips")) Zips <- GetZips() # if zip database not exists, import it.
+  
   for(i in 1:nrow(Result)){ # match and get information from zip database
     if(is.na(Result[i,1]))
       Result[i,c(1,6,3,4)] <- Zips[match(ZipLevels[i,1],Zips[,1]),c(2,4,6,7)] # Match the data such as city, lat, lon
+    # progress bar
+    if(i %% as.integer(nrow(Result)/100) == 0) cat("=",sep="")
   }
-  if(na.rm) Result <- na.omit(Result)
+  cat("\nMatchings completed.\n")
   return(Result) 
 }
 

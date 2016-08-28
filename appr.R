@@ -68,7 +68,7 @@ Convert <- function(data,col,class="numeric",na.rm=FALSE,limupper = 10^20){ # un
     Result <- na.omit(Result)
     if(class == "numeric"){
       for(i in col){ # remove the incorrect zips, zip codes cannot be equal or greater than 10^5
-        if(any(Result[,i] > limupper))
+        if(limupper != 0 && any(Result[,i] > limupper))
           Result <- Result[-which(Result[,i] > limupper),]
       }
     }
@@ -130,8 +130,8 @@ MultiGGPlot <- function(x,                    # data of x axis
                         smooth = FALSE,       # de/activate smoothing
                         smethod = "lm",       # smoothing method
                         formula=y ~ poly(x, 3, raw=TRUE), # formula for smoothing, linear, polynomial etc.
-                        width = 8,            # width as inches
-                        height = 4.5){        # height as inches
+                        width = 6,            # width as inches
+                        height = 3.375){      # height as inches
   
   require(ggplot2)
   if(is.null(colnames(x))) 
@@ -140,7 +140,7 @@ MultiGGPlot <- function(x,                    # data of x axis
   for(j in 1:ncol(x)){ # 1 through total column number (originally 1:dim(x)[2])
     for(i in 1:ncol(data)){
       if (identical(x[,j],data[,i])) next()
-      filename <- paste(fname,"_",i,"_",colnames(data[i]),"_vs_",colnames(x[j]),".png",sep = "") # form a file name with an index
+      filename <- paste(fname,"_",i+((j-1)*ncol(data)),"_",colnames(data[i]),"_vs_",colnames(x[j]),".png",sep = "") # form a file name with an index
       plotname <- paste(main," #",i,sep = "")
       ggplot(data, 
              aes(x = x[,j],
@@ -167,9 +167,9 @@ MultiGGPlot <- function(x,                    # data of x axis
 }
 
 # for quick arranging of Month10.txt and similars
-Format.SaleData <- function(data,na.rm = FALSE,ziplim = 10^5,solim = 10^9){
+Format.SaleData <- function(data,zipclass="character",na.rm = FALSE,ziplim = 10^5,solim = 0){
   Result <- GetTime(data,2) # get time series
-  Result <- Convert(Result,c(3,4),na.rm = na.rm,limupper = ziplim) # filter zips
+  Result <- Convert(Result,c(3,4),class=zipclass,na.rm = na.rm,limupper = ziplim) # filter zips
   Result <- Convert(Result,c(6,7,8),na.rm = na.rm,limupper = ziplim) # filter weight,units,price
   Result <- Convert(Result,1,na.rm = na.rm,limupper = solim) # filter SOnumbers
   Result <- SetColNames(Result) # set column names
@@ -177,14 +177,25 @@ Format.SaleData <- function(data,na.rm = FALSE,ziplim = 10^5,solim = 10^9){
 }
 
 # for quick arranging of ShippingData_Months_10to12.txt and similars
-Format.ShippingData <- function(data,na.rm = FALSE,ziplim = 10^5,solim = 2*(10^9),dulim = 1500){
+Format.ShippingData <- function(data,zipclass="character",na.rm = FALSE,ziplim = 10^5,solim = 0,dulim = 1500){
   Result <- GetTime(GetTime(data,9),10) # get time series
-  Result <- Convert(Result,c(4,5),na.rm = na.rm,limupper = ziplim) # filter zips
+  Result <- Convert(Result,c(4,5),class=zipclass,na.rm = na.rm,limupper = ziplim) # filter zips
   Result <- Convert(Result,8,na.rm = na.rm,limupper = solim) # filter SOnumbers
   Result <- Convert(Result,c(7,11),na.rm = na.rm,limupper = dulim) # filter duration and one more
   Result <- Convert(Result,c(1,2,3,6),class = "character",na.rm = na.rm,limupper = solim) # set rest as char
   Result <- SetColNames(Result,type = "shipping.data") # set column names
   return(Result)
+}
+
+# Searching indexes using which() can cause problems if classes are not the same. Using this function would be
+# more reliable.
+Search <- function(x,vector){
+  if(class(x)==class(vector))
+    return(which(vector == x))
+  else{
+    cat("Classes should be the same! ","(",class(x)," vs ",class(vector),")",sep = "")
+    return(-1)
+  }
 }
 
 # A quick solution for getting following data for each zip: location(city), lattitude, longtitude, amount of orders,

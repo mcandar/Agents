@@ -170,6 +170,7 @@ MultiGGPlot <- function(x,                    # data of x axis
 Format.SaleData <- function(data,zipclass="character",na.rm = FALSE,ziplim = 10^5,solim = 0){
   Result <- GetTime(data,2) # get time series
   Result <- Convert(Result,c(3,4),class=zipclass,na.rm = na.rm,limupper = ziplim) # filter zips
+  Result <- Convert(Result,5,class="character",na.rm = na.rm,limupper = 0) # trimws of the description column
   Result <- Convert(Result,c(6,7,8),na.rm = na.rm,limupper = ziplim) # filter weight,units,price
   Result <- Convert(Result,1,na.rm = na.rm,limupper = solim) # filter SOnumbers
   Result <- SetColNames(Result) # set column names
@@ -190,7 +191,7 @@ Format.ShippingData <- function(data,zipclass="character",na.rm = FALSE,ziplim =
 # Searching indexes using which() can cause problems if classes are not the same. Using this function would be
 # more reliable.
 Search <- function(x,vector){
-  if(class(x)==class(vector))
+  if(class(x)==class(vector)) # check if the classes are the same.
     return(which(vector == x))
   else{
     cat("Classes should be the same! ","(",class(x)," vs ",class(vector),")",sep = "")
@@ -200,6 +201,8 @@ Search <- function(x,vector){
 
 # A quick solution for getting following data for each zip: location(city), lattitude, longtitude, amount of orders,
 # state code, total sold units and total received payments.
+# please note that postal code information should be given as characters without any remove of leading 
+# zeros, total five digits.
 LocationLevels <- function(data,zipcol){
   ReceipentZips <- Convert(data,zipcol,class = "character")[,zipcol] # trim white spaces and convert to character for searching
   ZipLevels <- levels(factor(unlist(ReceipentZips))) # determine how many different zips there are
@@ -207,8 +210,8 @@ LocationLevels <- function(data,zipcol){
   
   Result <- as.data.frame(matrix(NA,nrow(ZipLevels),8)) # form a new data frame to later fill in
   Result[,2] <- ZipLevels
-  colnames(Result) <- c("Location","Zip Code","Lat","Lon","Order Amount","States Abb.","Total Units",
-                        "Total Payments")
+  colnames(Result) <- c("Location","ZipCode","Lat","Lon","Order Amount","StatesCode","TotalUnits",
+                        "TotalPayments")
   
   data$TotalPayments <- data[,7]*data[,8] # sum these as total payments and make it nineth column
   cat("Initialization completed.\n")
@@ -232,6 +235,38 @@ LocationLevels <- function(data,zipcol){
   }
   cat("\nMatchings completed.\n")
   return(Result) 
+}
+
+# return of this function can be directly plotted on map using plotly. result shows sale distribution by state
+# returns an array with the following data for each state: amount of orders, total shipped units to that state 
+# and gross profit according to payments of that state.
+StateLevels <- function(data,statecol=6,unitscol=7,profitscol=8,na.rm=TRUE){
+  temp <- levels(factor(unlist(data[,statecol]))) # get how many different states there are
+  Result <- as.data.frame(matrix(NA,length(temp),5)) # declare and initialize a matrix to fill in later
+  colnames(Result) <- c("StateCode","State","Orders","Units","GrossProfit")
+  Result[,1] <- temp 
+  
+  for (i in 1:nrow(Result)){ # get information from data
+    indexes <- which(data[,statecol] == Result[i,1]) # use which() to locate all states
+    Result[i,c(3,4,5)] <- c(length(indexes),                  # Amount of orders
+                            sum(as.numeric(data[indexes,unitscol])),  # Amount of shipped units
+                            sum(as.numeric(data[indexes,profitscol])))  # Profit
+  }
+  
+  if(!exists("Zips")) Zips <- GetZips() # if zip database does not exists, import it.
+  
+  for(i in 1:nrow(Result)){ # get information from zip database
+    if(is.na(Result[i,2])) # according to state names
+      Result[i,2] <- Zips[match(Result[i,1],Zips[,4]),3] # Match the data 
+  }
+  
+  if(na.rm) Result <- na.omit(Result)
+  
+  Result$hover <- with(Result, paste(State, '<br>', 
+                                     "Order Amount : ", Orders, "<br>",
+                                     "Total Units : ", Units,  "<br>",
+                                     "Gross Profit : ", round(GrossProfit,2)," USD",sep = ""))
+  return(Result)
 }
 
 # Calculate the correlations and plot them in a table (content of the function is properly 
@@ -299,6 +334,16 @@ CorLevels <- function(data,filename="Correlations",main = "Title"){
 #   # }
 #   return(p)
 # }
+
+# Check Graphical devices, warn the user if any of them is not working.
+CheckDevices <- function(){
+  temp <- capabilities()
+  devs <- temp[which(temp==F)]
+  if(length(devs)>0)
+    cat("Warning: Devices",names(devs),"are not available.\n")
+  else 
+    cat("All devices are properly working.")
+}
 
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###

@@ -48,7 +48,7 @@ GetTime <- function(data,col,format="%m/%d/%Y %H:%M:%S"){
 }
 
 # Convert classes of objects without loss of information
-Convert <- function(data,col,class="numeric",na.rm=FALSE,limupper = 10^20){ # unfactors and extracts the content out of it as numeric
+Convert <- function(data,col,class="numeric",na.rm=FALSE,limupper = 0){ # unfactors and extracts the content out of it as numeric
   Result <- data
   for(i in col){ # split XXXXX-XXXX type of zip data, take the right-hand side
     m <- strsplit(as.character(Result[,i]),"-")
@@ -269,28 +269,42 @@ StateLevels <- function(data,statecol=6,unitscol=7,profitscol=8,na.rm=TRUE){
   return(Result)
 }
 
-# Calculate the correlations and plot them in a table (content of the function is properly 
-# working outside the function, but function itself does not plot and save the graph.)
-CorLevels <- function(data,filename="Correlations",main = "Title"){
+# calculates correlation coefficients of a given matrix, plots it on a table. if needed, scales graph for
+# better observation
+CorLevels <- function(data,
+                      filename = "Correlations.pdf",
+                      device   = "pdf",
+                      main     = "Correlations",
+                      scaling  = FALSE,
+                      method   = "circle",
+                      type     = "full"){
+  
   Result <- cor(data) # calculate correlation coefficients
   Original <- Result
   n <- 0 # initialize a variable for counting
-  while(range(abs(Result))[1]<0.1){ # if absolute value of the smallest value if less than 0.1
-    for(i in 1:nrow(Result)){         # take square roots of the data to rescale, until it can be
-      for(j in 1:nrow(Result)){       # easily observable
-        if(Result[i,j] < 0)
-          Result[i,j] <- (-1)*sqrt(abs(Result[i,j])) # sqrt the abs value and then multiply by minus one
-        else
-          Result[i,j] <- sqrt(Result[i,j]) # normally sqrt the value itself
+  if(scaling){
+    while(range(abs(Result))[1]<0.1){ # if absolute value of the smallest value if less than 0.1
+      for(i in 1:nrow(Result)){         # take square roots of the data to rescale, until it can be
+        for(j in 1:nrow(Result)){       # easily observable
+          if(Result[i,j] < 0)
+            Result[i,j] <- (-1)*sqrt(abs(Result[i,j])) # sqrt the abs value and then multiply by minus one
+          else
+            Result[i,j] <- sqrt(Result[i,j]) # normally sqrt the value itself
+        }
       }
+      n <- n + 1 # count the number of cycles
     }
-    n <- n + 1 # count the number of cycles
   }
-  if(n>0) # warn the user about scaling
+  if(n>0){ # warn the user about scaling
     cat(n," times square root is taken (elementwise) for better scaling.\n",sep="")
-  require(lattice)
-  pdf(filename) # save following plot to a file with pdf format 
-  levelplot(Result,main = main) # plot levels with corresponding colors
+    main <- paste(main,"\n(",n," times square root is taken elementwise for better scaling.)",sep="")
+  }
+  require(corrplot)
+  switch (device,
+          "pdf" = pdf(filename),# save following plot to a file with pdf format
+          "png" = png(filename)
+  )
+  corrplot(Result,main = main,method = method,type = type,mar=c(0,0,3,0))
   dev.off() # turn the device off
   return(Original) # return the original correlations matrix
 }

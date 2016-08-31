@@ -19,8 +19,8 @@ GetZips <- function(){
 }
 
 # Row-wise sorting, ascending order. Just input data and column number you want to sort
-Sort <- function(data,col){
-  return(data[order(data[,col]),])
+Sort <- function(data,col,decreasing = FALSE){
+  return(data[order(data[,col],decreasing=decreasing),])
 }
 
 # Easily set column names for both sale data (Month10.txt, etc.) and shipping data (Shipp..nths10to12.txt, etc)
@@ -47,13 +47,15 @@ GetTime <- function(data,col,format="%m/%d/%Y %H:%M:%S"){
   return(Result)
 }
 
-# Convert classes of objects without loss of information
-Convert <- function(data,col,class="numeric",na.rm=FALSE,limupper = 0){ # unfactors and extracts the content out of it as numeric
+# convert classes with minimal possible loss of information
+Convert <- function(data,col,class="numeric",split=TRUE,na.rm=FALSE,limupper=0){ # unfactors and extracts the content out of it as numeric
   Result <- data
-  for(i in col){ # split XXXXX-XXXX type of zip data, take the right-hand side
-    m <- strsplit(as.character(Result[,i]),"-")
-    n <- as.data.frame(matrix(lapply(m, "[",1)))
-    Result[,i] <- as.data.frame(trimws(n[[1]]))
+  for(i in col){ # split XXXXX-XXXX type of zip data, take the left side
+    if(split){
+      m <- strsplit(as.character(Result[,i]),"-") # separate them by "-"
+      n <- as.data.frame(matrix(lapply(m, "[",1))) # take the left side
+      Result[,i] <- as.data.frame(trimws(n[[1]])) # trim white spaces
+    }
     switch (class,
             "numeric" = {
               Result[,i] <- as.numeric(as.character(Result[,i])) # originally denoted as Result$`Receipent Zip`
@@ -77,6 +79,7 @@ Convert <- function(data,col,class="numeric",na.rm=FALSE,limupper = 0){ # unfact
   }
   return(Result)
 }
+
 
 # Draw quick graphs with base plotting function
 MultiPlot <- function(x,                    # data of x axis
@@ -126,6 +129,7 @@ MultiGGPlot <- function(x,                    # data of x axis
                         main = "GGPlot",      # main title
                         fname = "GG_",        # prefix for filename
                         geom = "jitter",      # geometry of the plot
+                        colour = "black",
                         alpha = I(1/10),      # transparecy of the points
                         smooth = FALSE,       # de/activate smoothing
                         smethod = "lm",       # smoothing method
@@ -144,7 +148,11 @@ MultiGGPlot <- function(x,                    # data of x axis
       plotname <- paste(main," #",i,sep = "")
       ggplot(data, 
              aes(x = x[,j],
-                 y = data[,i])) +
+                 y = data[,i],
+                 colour = colour)) +
+        
+        scale_colour_gradientn(colours=rainbow(4)) +
+        
         switch (geom,
                 "jitter" = {geom_jitter(alpha = alpha)},
                 "point" = {geom_point(alpha = alpha)},

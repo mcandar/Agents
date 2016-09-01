@@ -245,6 +245,7 @@ LocationLevels <- function(data,zipcol){
   return(Result) 
 }
 
+# Input of the following function is output of the function "LocationLevel()"
 # return of this function can be directly plotted on map using plotly. result shows sale distribution by state
 # returns an array with the following data for each state: amount of orders, total shipped units to that state 
 # and gross profit according to payments of that state.
@@ -365,6 +366,21 @@ CheckDevices <- function(){
     cat("Warning: Devices",names(devs),"are not available.\n")
   else 
     cat("All devices are properly working.")
+}
+
+# following function checks whether a given coordinate is inside USA borders, the reason it has a switch()
+# function is easier future improvements for others countries.
+is.inside <- function(lat,lon,map = "USA"){
+  if(length(lat)==length(lon)){
+    Result <- list()
+    switch (map,
+            "USA" = for(i in 1:length(lat))
+              Result[i] <- 25 < lat[i] && lat[i] < 50 && -124 < lon[i] && lon[i] < -66
+    )
+  }
+  else
+    cat("Lengths of lattitude and longitude vectors must be the same.\n")
+  return(Result)
 }
 
 ### ----------------------------------------------------------------------- ###

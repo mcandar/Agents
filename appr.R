@@ -32,7 +32,7 @@ SetColNames <- function(data,type = "sale.data"){
     },
     "shipping.data" = {
       colnames(data) <- c("TrackingNumber","Company","ShippingCode","SenderZip","ReceipentZip","Type",
-                          "Item Weight","SONumber","DateShipped","DateDelivered","Duration")
+                          "ShippingCost","SONumber","DateShipped","DateDelivered","Duration")
     }
   )
   return(data)
@@ -48,7 +48,7 @@ GetTime <- function(data,col,format="%m/%d/%Y %H:%M:%S"){
 }
 
 # convert classes with minimal possible loss of information
-Convert <- function(data,col,class="numeric",split=TRUE,na.rm=FALSE,limupper=0){ # unfactors and extracts the content out of it as numeric
+Convert <- function(data,col,class="numeric",split=FALSE,na.rm=FALSE,limupper=0){ # unfactors and extracts the content out of it as numeric
   Result <- data
   for(i in col){ # split XXXXX-XXXX type of zip data, take the left side
     if(split){
@@ -56,6 +56,9 @@ Convert <- function(data,col,class="numeric",split=TRUE,na.rm=FALSE,limupper=0){
       n <- as.data.frame(matrix(lapply(m, "[",1))) # take the left side
       Result[,i] <- as.data.frame(trimws(n[[1]])) # trim white spaces
     }
+    else
+      Result[,i] <- as.data.frame(trimws(Raw[,i])) # trim white spaces without splitting
+    
     switch (class,
             "numeric" = {
               Result[,i] <- as.numeric(as.character(Result[,i])) # originally denoted as Result$`Receipent Zip`
@@ -124,6 +127,7 @@ MultiPlot <- function(x,                    # data of x axis
 }
 
 # Draw multiple higher quality graphs with ggplot2, inputs can be multi-column data frames
+# color input may not work properly, and it does not add color parameter name to legend
 MultiGGPlot <- function(x,                    # data of x axis
                         data,                 # data set of y axis
                         main = "GGPlot",      # main title
@@ -177,7 +181,7 @@ MultiGGPlot <- function(x,                    # data of x axis
 # for quick arranging of Month10.txt and similars
 Format.SaleData <- function(data,zipclass="character",na.rm = FALSE,ziplim = 10^5,solim = 0){
   Result <- GetTime(data,2) # get time series
-  Result <- Convert(Result,c(3,4),class=zipclass,na.rm = na.rm,limupper = ziplim) # filter zips
+  Result <- Convert(Result,c(3,4),class=zipclass,na.rm = na.rm,limupper = ziplim,split = TRUE) # filter zips
   Result <- Convert(Result,5,class="character",na.rm = na.rm,limupper = 0) # trimws of the description column
   Result <- Convert(Result,c(6,7,8),na.rm = na.rm,limupper = ziplim) # filter weight,units,price
   Result <- Convert(Result,1,na.rm = na.rm,limupper = solim) # filter SOnumbers
@@ -188,7 +192,7 @@ Format.SaleData <- function(data,zipclass="character",na.rm = FALSE,ziplim = 10^
 # for quick arranging of ShippingData_Months_10to12.txt and similars
 Format.ShippingData <- function(data,zipclass="character",na.rm = FALSE,ziplim = 10^5,solim = 0,dulim = 1500){
   Result <- GetTime(GetTime(data,9),10) # get time series
-  Result <- Convert(Result,c(4,5),class=zipclass,na.rm = na.rm,limupper = ziplim) # filter zips
+  Result <- Convert(Result,c(4,5),class=zipclass,na.rm = na.rm,limupper = ziplim,split = TRUE) # filter zips
   Result <- Convert(Result,8,na.rm = na.rm,limupper = solim) # filter SOnumbers
   Result <- Convert(Result,c(7,11),na.rm = na.rm,limupper = dulim) # filter duration and one more
   Result <- Convert(Result,c(1,2,3,6),class = "character",na.rm = na.rm,limupper = solim) # set rest as char

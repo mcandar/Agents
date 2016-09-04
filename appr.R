@@ -57,7 +57,7 @@ Convert <- function(data,col,class="numeric",split=FALSE,na.rm=FALSE,limupper=0)
       Result[,i] <- as.data.frame(trimws(n[[1]])) # trim white spaces
     }
     else
-      Result[,i] <- as.data.frame(trimws(Raw[,i])) # trim white spaces without splitting
+      Result[,i] <- as.data.frame(trimws(Result[,i])) # trim white spaces without splitting
     
     switch (class,
             "numeric" = {

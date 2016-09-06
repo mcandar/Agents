@@ -206,7 +206,7 @@ Search <- function(x,vector){
   if(class(x)==class(vector)) # check if the classes are the same.
     return(which(vector == x))
   else{
-    cat("Classes should be the same! ","(",class(x)," vs ",class(vector),")",sep = "")
+    cat("Classes should be the same! ","(",class(x)," vs ",class(vector),")\n",sep = "")
     return(-1)
   }
 }
@@ -384,6 +384,16 @@ is.inside <- function(lat,lon,map = "USA"){
   }
   else
     cat("Lengths of lattitude and longitude vectors must be the same.\n")
+  return(Result)
+}
+
+# for a given vector or a list of source, search elements of source in target and list them
+Collect <- function(source,target,col){
+  Result <- as.data.frame(matrix(NA,0,ncol(target))) # initialize a data frame to fill in later
+  for(i in 1:length(source)){
+    index <- which(target[,col]==source[i]) # search the source in target, get indexes
+    Result <- rbind(Result,cbind(rep(source[i],length(index)),target[index,])) # 
+  }
   return(Result)
 }
 

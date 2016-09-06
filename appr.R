@@ -389,7 +389,9 @@ is.inside <- function(lat,lon,map = "USA"){
 
 # for a given vector or a list of source, search elements of source in target and list them
 Collect <- function(source,target,col,scol=1){
+  # Result <- as.data.frame(matrix(NA,0,ncol(target))) 
   Result <- data.frame() # initialize a data frame to fill in later
+  
   if(is.null(ncol(source))){ # do these if source is a vector
     for(i in 1:length(source)){
       index <- which(target[,col]==source[i]) # search the source in target, get indexes
@@ -399,7 +401,12 @@ Collect <- function(source,target,col,scol=1){
   else{ # do these if source is a multi column data frame
     for(i in 1:nrow(source)){
       index <- which(target[,col]==source[i,scol]) # search the source in target, get indexes
-      Result <- rbind(Result,cbind(matrix(rep(source[i,],length(index)),length(index),ncol(source)),target[index,])) # 
+      Result <- rbind(Result,
+                      cbind(matrix(rep(as.character(source[i,]), # as.character() function is necessary
+                                       length(index)),
+                                   length(index),
+                                   ncol(source)),
+                            target[index,])) # 
     }
   }
   return(Result)

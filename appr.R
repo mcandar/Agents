@@ -397,6 +397,26 @@ Search.List <- function(source,target,col){
   return(Result)
 }
 
+# easier search of coordinates, this function returns just lat and lon
+zip.coordinates <- function(x){
+  if(!exists("Zips")) Zips <- GetZips() # if zip database does not exists, import it.
+  Result <- as.data.frame(matrix(NA,length(x),2)) # to store lat and lon respectively
+  for(i in 1:length(x))
+    Result[i,] <- Zips[match(x[i],Zips[,1]),c(6,7)]
+  colnames(Result) <- c("Lattitude","Longitude")
+  return(Result)
+}
+
+# prepare a function for easier city and state matching
+zip.location <- function(x){
+  if(!exists("Zips")) Zips <- GetZips() # if zip database does not exists, import it.
+  Result <- as.data.frame(matrix(NA,length(x),2)) # to store lat and lon respectively
+  for(i in 1:length(x))
+    Result[i,] <- Zips[match(x[i],Zips[,1]),c(2,4)]
+  colnames(Result) <- c("City","StateCode")
+  return(Result)
+}
+
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###
 ### ----------------------------------------------------------------------- ###

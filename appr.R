@@ -136,6 +136,7 @@ MultiGGPlot <- function(x,                    # data of x axis
                         colour = "black",     # colour scale
                         colourname = "colour",# title of the legend
                         alpha = I(1/10),      # transparecy of the points
+                        device = "png",       # choose the extension of the file
                         smooth = FALSE,       # de/activate smoothing
                         smethod = "lm",       # smoothing method
                         formula=y ~ poly(x, 3, raw=TRUE), # formula for smoothing, linear, polynomial etc.
@@ -149,7 +150,7 @@ MultiGGPlot <- function(x,                    # data of x axis
   for(j in 1:ncol(x)){ # 1 through total column number (originally 1:dim(x)[2])
     for(i in 1:ncol(data)){
       if (identical(x[,j],data[,i])) next()
-      filename <- paste(fname,"_",i+((j-1)*ncol(data)),"_",colnames(data[i]),"_vs_",colnames(x[j]),".png",sep = "") # form a file name with an index
+      filename <- paste(fname,"_",i+((j-1)*ncol(data)),"_",colnames(data[i]),"_vs_",colnames(x[j]),".",device,sep = "") # form a file name with an index
       plotname <- paste(main," #",i,sep = "")
       ggplot(data, 
              aes(x = x[,j],
@@ -173,7 +174,7 @@ MultiGGPlot <- function(x,                    # data of x axis
           geom_smooth(method=smethod, se=TRUE, fill=NA,
                       formula=formula,colour="blue")
       
-      ggsave(filename,device = "png",width = width,height = height)
+      ggsave(filename,device = device,width = width,height = height)
       cat("Image",filename,"saved to",getwd(),"\n")
     }
   }
@@ -416,6 +417,68 @@ zip.location <- function(x){
   for(i in 1:length(x))
     Result[i,] <- Zips[match(x[i],Zips[,1]),c(2,4)]
   colnames(Result) <- c("City","StateCode")
+  return(Result)
+}
+
+# collect and organize provider's data
+Warehouses <- function(senderzips,      # input levels of supplier postal codes
+                       saledata,        # input sale data
+                       shipdata,        # input shipping data
+                       col.zip=4,       # column number of sender zips in SHIPDATA
+                       col.zip.sale=3,  # column number of sender zips in SALEDATA
+                       col.unit=7,      # col number of units in SALEDATA
+                       col.distance=20, # col number in shipdata
+                       col.duration=11, # in shipdata
+                       col.cost=7,      # in shipdata
+                       r.lat=14,        # in shipdata
+                       r.lon=15){       # in shipdata
+  
+  if(!exists("Zips")) Zips <- GetZips() # if zip database not exists, import it.
+  
+  Result <- Search.List(senderzips,Zips,1)[,-1]
+  Result <- cbind(Result,Uses=NA,Units=NA,Ave.Distance=NA,Ave.Duration=NA,Ave.Cost=NA,Ave.R.Lat=NA,Ave.R.Lon=NA)
+  shipdata <- Convert(shipdata,c(12,13,14,15))
+  Result <- Convert(Result,c(6,7))
+  
+  for(i in 1:nrow(Result)){
+    index <- which(shipdata[,col.zip]==Result[i,1])
+    Result[i,c(8,9,10,11,12,13,14)] <- c(length(index), # uses
+                                         sum(saledata[which(saledata[,col.zip.sale]==Result[i,1]),col.unit]), # units 
+                                         mean(na.omit(shipdata[index,col.distance])), # average distance
+                                         mean(na.omit(shipdata[index,col.duration])), # average duration
+                                         mean(na.omit(shipdata[index,col.cost])),     # average cost
+                                         mean(na.omit(shipdata[which(shipdata[,r.lat]==Result[i,6]),r.lat])),
+                                         mean(na.omit(shipdata[which(shipdata[,r.lon]==Result[i,7]),r.lon]))
+    )
+  }
+  
+  Result <- Sort(Result,9,decreasing = TRUE)
+  return(Result)
+}
+
+# collect and organize data of shipping types
+CargoTypes <- function(product,         # name of the product
+                       shipdata,        # input shipping data
+                       col.type=6,      # number of the column which contains shipment types in shipdata
+                       col.cost=7,      # column number of the shipping costs in shipdata
+                       col.duration=11, # in shipdata
+                       col.distance=20  # in shipdata
+){
+  
+  Result <- data.frame(Product=product,
+                       Type=levels(factor(shipdata[,col.type])),
+                       AverageCost=NA,
+                       TotalUse=NA,
+                       AverageDuration=NA,
+                       TotalCost=NA,
+                       AverageDistance=NA)
+  
+  Result[,3] <- sapply(Result[,2], function(x) mean(shipdata[which(shipdata[,col.type]==x),col.cost])) # average cost
+  Result[,4] <- sapply(Result[,2], function(x) length(which(shipdata[,col.type]==x))) # total uses
+  Result[,5] <- sapply(Result[,2], function(x) mean(na.omit(shipdata[which(shipdata[,col.type]==x),col.duration]))) # ave. dur.
+  Result[,6] <- sapply(Result[,2], function(x) sum(shipdata[which(shipdata[,col.type]==x),col.cost])) # total cost
+  Result[,7] <- sapply(Result[,2], function(x) mean(na.omit(shipdata[which(shipdata[,col.type]==x),col.distance]))) # ave. dist.
+  Result <- Sort(Result,3,decreasing = TRUE)
   return(Result)
 }
 

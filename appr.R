@@ -133,7 +133,8 @@ MultiGGPlot <- function(x,                    # data of x axis
                         main = "GGPlot",      # main title
                         fname = "GG_",        # prefix for filename
                         geom = "jitter",      # geometry of the plot
-                        colour = "black",
+                        colour = "black",     # colour scale
+                        colourname = "colour",# title of the legend
                         alpha = I(1/10),      # transparecy of the points
                         smooth = FALSE,       # de/activate smoothing
                         smethod = "lm",       # smoothing method
@@ -165,7 +166,8 @@ MultiGGPlot <- function(x,                    # data of x axis
         
         labs(title = main,
              x = colnames(x[j]),
-             y = colnames(data[i])) +
+             y = colnames(data[i]),
+             colour = colourname) +
         
         if(smooth)
           geom_smooth(method=smethod, se=TRUE, fill=NA,
@@ -397,7 +399,7 @@ Search.List <- function(source,target,col){
   return(Result)
 }
 
-# easier search of coordinates, this function returns just lat and lon
+# input is zip code. easier search of coordinates, this function returns just lat and lon
 zip.coordinates <- function(x){
   if(!exists("Zips")) Zips <- GetZips() # if zip database does not exists, import it.
   Result <- as.data.frame(matrix(NA,length(x),2)) # to store lat and lon respectively
@@ -407,7 +409,7 @@ zip.coordinates <- function(x){
   return(Result)
 }
 
-# prepare a function for easier city and state matching
+# input is a zip code. prepare a function for easier city and state matching
 zip.location <- function(x){
   if(!exists("Zips")) Zips <- GetZips() # if zip database does not exists, import it.
   Result <- as.data.frame(matrix(NA,length(x),2)) # to store lat and lon respectively

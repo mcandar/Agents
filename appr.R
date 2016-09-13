@@ -431,7 +431,7 @@ zip.location <- function(x){
   return(Result)
 }
 
-# collect and organize provider's data (tested)
+# collect and organize provider's data
 Warehouses <- function(senderzips,      # input levels (or just itself) of supplier postal codes
                        saledata,        # input sale data
                        shipdata,        # input shipping data
@@ -467,7 +467,7 @@ Warehouses <- function(senderzips,      # input levels (or just itself) of suppl
   return(Result)
 }
 
-# collect and organize data of shipping types, for one product (NOT tested)
+# collect and organize data of shipping types, for one product
 CargoTypes <- function(product,          # name of the product
                        shipdata,         # input shipping data
                        col.type=6,       # number of the column which contains shipment types in shipdata
@@ -517,6 +517,7 @@ Partial.ShipData <- function(sonumber,           # complete list of sonumbers
   # declare and preallocate new columns
   Result <- cbind(Result,S.Lat=NA,S.Lon=NA,R.Lat=NA,R.Lon=NA,S.City=NA,S.StateCode=NA,R.City=NA,
                   R.StateCode=NA,Distance=NA,Product=NA)
+  print("Final output is preallocated.")
   
   # get coordinates as lat and lon from zips
   Result[,c(12,13)] <- zip.coordinates(Result[,4])[,c(1,2)] # find coordinates of sender zips

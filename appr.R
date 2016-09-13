@@ -420,7 +420,7 @@ zip.location <- function(x){
   return(Result)
 }
 
-# collect and organize provider's data
+# collect and organize provider's data (tested)
 Warehouses <- function(senderzips,      # input levels of supplier postal codes
                        saledata,        # input sale data
                        shipdata,        # input shipping data
@@ -456,14 +456,13 @@ Warehouses <- function(senderzips,      # input levels of supplier postal codes
   return(Result)
 }
 
-# collect and organize data of shipping types
-CargoTypes <- function(product,         # name of the product
-                       shipdata,        # input shipping data
-                       col.type=6,      # number of the column which contains shipment types in shipdata
-                       col.cost=7,      # column number of the shipping costs in shipdata
-                       col.duration=11, # in shipdata
-                       col.distance=20  # in shipdata
-){
+# collect and organize data of shipping types, for one product (not tested)
+CargoTypes <- function(product,          # name of the product
+                       shipdata,         # input shipping data
+                       col.type=6,       # number of the column which contains shipment types in shipdata
+                       col.cost=7,       # column number of the shipping costs in shipdata
+                       col.duration=11,  # in shipdata
+                       col.distance=20){ # in shipdata
   
   Result <- data.frame(Product=product,
                        Type=levels(factor(shipdata[,col.type])),
@@ -479,6 +478,58 @@ CargoTypes <- function(product,         # name of the product
   Result[,6] <- sapply(Result[,2], function(x) sum(shipdata[which(shipdata[,col.type]==x),col.cost])) # total cost
   Result[,7] <- sapply(Result[,2], function(x) mean(na.omit(shipdata[which(shipdata[,col.type]==x),col.distance]))) # ave. dist.
   Result <- Sort(Result,3,decreasing = TRUE)
+  return(Result)
+}
+
+# for easier obtaining of a product's shipping data (not tested)
+Partial.ShipData <- function(sonumber,           # complete list of sonumbers
+                             product,            # name of the product, just one name, not a set of names
+                             ship,               # raw ship data, i.e. ShippingData_Mont...txt
+                             col.sonumber=8,     # number of the column containing sonumbers in raw ship data
+                             furtherinfo=FALSE){ # show detailed info 
+  
+  mylevels <- levels(factor(sonumber)) # see levels of SONumbers
+  
+  # convert to characters for faster searching, then find indexes that contain searched SONumber
+  ShipSONumber <- as.character(ship[,col.sonumber])
+  index <- list(a=c(1,2,3),b=c(1,2)) # arbitrarily initialize, let it store rows with various lengths
+  for(i in 1:length(mylevels))
+    index[[i]] <- which(mylevels[i]==ShipSONumber)
+  paste("Indexes determined.")
+  
+  # get corresponding shipping data from indexes
+  Result <- data.frame()
+  for(i in 1:length(index))
+    Result <- rbind(Result,ship[index[[i]],])
+  paste("Base data is extracted from raw shipping data.")
+  
+  # declare and preallocate new columns
+  Result <- cbind(Result,S.Lat=NA,S.Lon=NA,R.Lat=NA,R.Lon=NA,S.City=NA,S.StateCode=NA,R.City=NA,
+                  R.StateCode=NA,Distance=NA,Product=NA)
+  
+  # get coordinates as lat and lon from zips
+  Result[,c(12,13)] <- zip.coordinates(Result[,4])[,c(1,2)] # find coordinates of sender zips
+  Result[,c(14,15)] <- zip.coordinates(Result[,5])[,c(1,2)] # find coordinates of receipent zips
+  
+  # get location names from zips
+  Result[,c(16,17)] <- zip.location(Result[,4])[,c(1,2)] # find city/state of sender zips
+  Result[,c(18,19)] <- zip.location(Result[,5])[,c(1,2)] # find city/state of receipent zips
+  
+  # calculate the distance between supplier and customer
+  require(geosphere)
+  Dist <- distHaversine(cbind(as.numeric(Result$S.Lon),as.numeric(Result$S.Lat)),
+                        cbind(as.numeric(Result$R.Lon),as.numeric(Result$R.Lat))) # in meters
+  Result$Distance <- round(Dist/1000,3) # as kilometers
+  Result$Product <- product # add product name to prevent confusions
+  paste("Location information is collected.")
+  
+  # further information for BestSeller item's Shipping Data
+  if(furtherinfo){
+    paste("\nFurther information:")
+    paste("There are",levels(factor(Result$Type)),"different shipment types.") # different shipment types
+    paste("Average delivery duration is",mean(na.omit(Result$Duration)),"days.") # average delivery day
+    paste("Average cost for each delivery is",mean(na.omit(Result$ShippingCost)),"USD.") # average cost
+  }
   return(Result)
 }
 

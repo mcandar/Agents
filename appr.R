@@ -421,7 +421,7 @@ zip.location <- function(x){
 }
 
 # collect and organize provider's data (tested)
-Warehouses <- function(senderzips,      # input levels of supplier postal codes
+Warehouses <- function(senderzips,      # input levels (or just itself) of supplier postal codes
                        saledata,        # input sale data
                        shipdata,        # input shipping data
                        col.zip=4,       # column number of sender zips in SHIPDATA
@@ -435,7 +435,7 @@ Warehouses <- function(senderzips,      # input levels of supplier postal codes
   
   if(!exists("Zips")) Zips <- GetZips() # if zip database not exists, import it.
   
-  Result <- Search.List(senderzips,Zips,1)[,-1]
+  Result <- Search.List(as.character(levels(factor(senderzips))),Zips,1)[,-1]
   Result <- cbind(Result,Uses=NA,Units=NA,Ave.Distance=NA,Ave.Duration=NA,Ave.Cost=NA,Ave.R.Lat=NA,Ave.R.Lon=NA)
   shipdata <- Convert(shipdata,c(12,13,14,15))
   Result <- Convert(Result,c(6,7))
@@ -533,7 +533,7 @@ Partial.ShipData <- function(sonumber,           # complete list of sonumbers
   return(Result)
 }
 
-# list the best products according to 3 type and number of products, e.g. top 100, top 10 etc. (NOT tested)
+# list the best products according to 3 type and number of products, e.g. top 100, top 10 etc.
 Product.List <- function(saledata,type="bestseller",limit=110){   
   # be careful, both data must be white-space trimmed, even the lists must be. 
   products <- data.frame(Name=levels(factor(saledata[,5]))) # see and store how many different products
@@ -541,22 +541,42 @@ Product.List <- function(saledata,type="bestseller",limit=110){
   switch (type,
           "bestseller" = {
             #following line of code is like a for loop, calculates how much an item sold
-            products[,2] <- sapply(products[,1],function(x) sum(saledata[which(saledata[,5] == x),7])) # rowwise
+            products$Quantity <- sapply(products[,1],function(x) sum(saledata[which(saledata[,5] == x),7])) # rowwise
+            temp <- Sort(products,2,decreasing = TRUE)[1:limit,] # get the sorted array, name and quantity
+            Result <- data.frame(Name=temp[,1],Quantity=temp[,2],Profit=NA,Price=NA,Orders=NA)
+            for(i in 1:nrow(Result)){
+              index <- which(saledata[,5] == Result[i,1])
+              Result[i,c(3,4,5)]<- c(sum(saledata[index,9]), # total profit from that item
+                                     saledata[index[1],8],   # price of the item
+                                     length(index))          # number of orders
+            }
+            Result <- Sort(Result,2,decreasing = TRUE) # sort w.r.t. quantity
           },
           "mostprofitable" = {
-            products[,2] <- sapply(products[,1],function(x) sum(saledata[which(saledata[,5] == x),9])) # rowwise
+            products$Profit <- sapply(products[,1],function(x) sum(saledata[which(saledata[,5] == x),9])) # rowwise
+            temp <- Sort(products,2,decreasing = TRUE)[1:limit,] # get the sorted array, name and profit
+            Result <- data.frame(Name=temp[,1],Quantity=NA,Profit=temp[,2],Price=NA,Orders=NA)
+            for(i in 1:nrow(Result)){
+              index <- which(saledata[,5] == Result[i,1])
+              Result[i,c(2,4,5)]<- c(sum(saledata[index,7]), # sold quantity
+                                     saledata[index[1],8],   # price of the item
+                                     length(index))          # number of orders
+            }
+            Result <- Sort(Result,3,decreasing = TRUE) # sort w.r.t. profit
           },
           "mostordered" = {
             products[,2] <- sapply(products[,1],function(x) length(which(saledata[,5] == x)))
+            temp <- Sort(products,2,decreasing = TRUE)[1:limit,] # get the sorted array, name and orders
+            Result <- data.frame(Name=temp[,1],Quantity=NA,Profit=NA,Price=NA,Orders=temp[,2])
+            for(i in 1:nrow(Result)){
+              index <- which(saledata[,5] == Result[i,1])
+              Result[i,c(3,4,2)]<- c(sum(saledata[index,9]), # total profit from that item
+                                     saledata[index[1],8],   # price of the item
+                                     sum(saledata[index,7])) # sold quantity
+            }
+            Result <- Sort(Result,5,decreasing = TRUE) # sort w.r.t. profit
           }
   )
-  
-  Result <- data.frame(Name=Sort(products,2,decreasing = TRUE)[1:limit,],Profit=NA,Price=NA,Orders=NA)
-  
-  for(i in 1:nrow(Result)){
-    index <- which(saledata[,5] == Result[i,1])
-    Result[i,c(3,4,5)]<- c(sum(saledata[index,9]),saledata[index[1],8],length(index)) # find profit, price and number of orders
-  }
   return(Result)
 }
 

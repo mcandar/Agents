@@ -506,13 +506,13 @@ Partial.ShipData <- function(sonumber,           # complete list of sonumbers
   index <- list(a=c(1,2,3),b=c(1,2)) # arbitrarily initialize, let it store rows with various lengths
   for(i in 1:length(mylevels))
     index[[i]] <- which(mylevels[i]==ShipSONumber)
-  paste("Indexes determined.")
+  print("Indexes determined.")
   
   # get corresponding shipping data from indexes
   Result <- data.frame()
   for(i in 1:length(index))
     Result <- rbind(Result,ship[index[[i]],])
-  paste("Base data is extracted from raw shipping data.")
+  print("Base data is extracted from raw shipping data.")
   
   # declare and preallocate new columns
   Result <- cbind(Result,S.Lat=NA,S.Lon=NA,R.Lat=NA,R.Lon=NA,S.City=NA,S.StateCode=NA,R.City=NA,
@@ -532,7 +532,7 @@ Partial.ShipData <- function(sonumber,           # complete list of sonumbers
                         cbind(as.numeric(Result$R.Lon),as.numeric(Result$R.Lat))) # in meters
   Result$Distance <- round(Dist/1000,3) # as kilometers
   Result$Product <- product # add product name to prevent confusions
-  paste("Location information is collected.")
+  print("Location information is collected.")
   
   # further information for BestSeller item's Shipping Data
   if(furtherinfo){
@@ -545,7 +545,11 @@ Partial.ShipData <- function(sonumber,           # complete list of sonumbers
 }
 
 # list the best products according to 3 type and number of products, e.g. top 100, top 10 etc.
-Product.List <- function(saledata,type="bestseller",limit=110){   
+Product.List <- function(saledata,          # raw sale data e.g. Month10.txt etc.
+                         type="bestseller", # bestseller, mostprofitable or mostordered
+                         limit=110){        # 100 for top 100, or 10 for top 10, selecting this greater than
+                                            # exact number of elements is recommend in orde to exclude
+                                            # unwanted items 
   # be careful, both data must be white-space trimmed, even the lists must be. 
   products <- data.frame(Name=levels(factor(saledata[,5]))) # see and store how many different products
   saledata$Total <- saledata$UnitsShipped*saledata$AverageUnitPrice # get the profit from that product

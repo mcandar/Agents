@@ -182,21 +182,32 @@ MultiGGPlot <- function(x,                    # data of x axis
 }
 
 # for quick arranging of Month10.txt and similars
-Format.SaleData <- function(data,zipclass="character",na.rm = FALSE,ziplim = 10^5,solim = 0){
+Format.SaleData <- function(data,                 # sale data e.g. Month10.txt, Month11.txt etc.
+                            zipclass="character", # class of Sender and Receipent Zips
+                            soclass="numeric",    # class of SONumbers
+                            na.rm = FALSE,        # remove NA rows
+                            ziplim = 10^5,        # upper limit of zips, greater is invalid
+                            solim = 0){           # upper limit of SONumber, greater is invalid,zero = no limit
   Result <- GetTime(data,2) # get time series
   Result <- Convert(Result,c(3,4),class=zipclass,na.rm = na.rm,limupper = ziplim,split = TRUE) # filter zips
-  Result <- Convert(Result,5,class="character",na.rm = na.rm,limupper = 0) # trimws of the description column
+  Result <- Convert(Result,5,class="character",na.rm = na.rm,limupper = 0) # description column
   Result <- Convert(Result,c(6,7,8),na.rm = na.rm,limupper = ziplim) # filter weight,units,price
-  Result <- Convert(Result,1,na.rm = na.rm,limupper = solim) # filter SOnumbers
+  Result <- Convert(Result,1,class=soclass,na.rm = na.rm,limupper = solim) # filter SOnumbers
   Result <- SetColNames(Result) # set column names
   return(Result)
 }
 
 # for quick arranging of ShippingData_Months_10to12.txt and similars
-Format.ShippingData <- function(data,zipclass="character",na.rm = FALSE,ziplim = 10^5,solim = 0,dulim = 1500){
+Format.ShippingData <- function(data,                 # shipping data e.g. ShippingData_Mont....txt etc.
+                                zipclass="character", # class of Sender and Receipent Zips
+                                soclass="numeric",    # class of SONumbers
+                                na.rm = FALSE,        # remove NA rows
+                                ziplim = 10^5,        # upper limit of zips, greater is invalid
+                                solim = 0,            # upper limit of SONumber, greater is invalid,zero = no limit
+                                dulim = 1500){        # upper limit of duration as days
   Result <- GetTime(GetTime(data,9),10) # get time series
   Result <- Convert(Result,c(4,5),class=zipclass,na.rm = na.rm,limupper = ziplim,split = TRUE) # filter zips
-  Result <- Convert(Result,8,na.rm = na.rm,limupper = solim) # filter SOnumbers
+  Result <- Convert(Result,8,class=soclass,na.rm = na.rm,limupper = solim) # filter SOnumbers
   Result <- Convert(Result,c(7,11),na.rm = na.rm,limupper = dulim) # filter duration and one more
   Result <- Convert(Result,c(1,2,3,6),class = "character",na.rm = na.rm,limupper = solim) # set rest as char
   Result <- SetColNames(Result,type = "shipping.data") # set column names
@@ -488,7 +499,7 @@ Partial.ShipData <- function(sonumber,           # complete list of sonumbers
                              col.sonumber=8,     # number of the column containing sonumbers in raw ship data
                              furtherinfo=FALSE){ # show detailed info 
   
-  mylevels <- levels(factor(sonumber)) # see levels of SONumbers
+  mylevels <- as.character(levels(factor(sonumber))) # see levels of SONumbers
   
   # convert to characters for faster searching, then find indexes that contain searched SONumber
   ShipSONumber <- as.character(ship[,col.sonumber])

@@ -509,15 +509,20 @@ Partial.ShipData <- function(sonumber,           # complete list of sonumbers
   print("Indexes determined.")
   
   # get corresponding shipping data from indexes
-  Result <- data.frame()
-  for(i in 1:length(index))
-    Result <- rbind(Result,ship[index[[i]],])
-  print("Base data is extracted from raw shipping data.")
+  temp <- data.frame() # declare a temporary data frame to use in for loop (this make algorithm simplar)
+  Result <- as.data.frame(matrix(NA,nrow=sum(lengths(index,use.names = FALSE)),
+                                 ncol=21)) # preallocate main data frame
+  colnames(Result) <- c("TrackingNumber","Company","ShippingCode","SenderZip","ReceipentZip","Type",
+                        "ShippingCost","SONumber","DateShipped","DateDelivered","Duration","S.Lat",
+                        "S.Lon","R.Lat","R.Lon","S.City","S.StateCode","R.City","R.StateCode",
+                        "Distance","Product")
   
-  # declare and preallocate new columns
-  Result <- cbind(Result,S.Lat=NA,S.Lon=NA,R.Lat=NA,R.Lon=NA,S.City=NA,S.StateCode=NA,R.City=NA,
-                  R.StateCode=NA,Distance=NA,Product=NA)
-  print("Final output is preallocated.")
+  # match data
+  for(i in 1:length(index))
+    temp <- rbind(temp,ship[index[[i]],])
+  
+  Result[,1:11] <- temp # assign it to main data frame
+  print("Base data is extracted from raw shipping data.")
   
   # get coordinates as lat and lon from zips
   Result[,c(12,13)] <- zip.coordinates(Result[,4])[,c(1,2)] # find coordinates of sender zips

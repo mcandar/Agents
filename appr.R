@@ -431,131 +431,13 @@ zip.location <- function(x){
   return(Result)
 }
 
-# collect and organize provider's data
-Warehouses <- function(senderzips,      # input levels (or just itself) of supplier postal codes
-                       saledata,        # input sale data
-                       shipdata,        # input shipping data
-                       col.zip=4,       # column number of sender zips in SHIPDATA
-                       col.zip.sale=3,  # column number of sender zips in SALEDATA
-                       col.unit=7,      # col number of units in SALEDATA
-                       col.distance=20, # col number in shipdata
-                       col.duration=11, # in shipdata
-                       col.cost=7,      # in shipdata
-                       r.lat=14,        # in shipdata
-                       r.lon=15){       # in shipdata
-  
-  if(!exists("Zips")) Zips <- GetZips() # if zip database not exists, import it.
-  
-  Result <- Search.List(as.character(levels(factor(senderzips))),Zips,1)[,-1]
-  Result <- cbind(Result,Uses=NA,Units=NA,Ave.Distance=NA,Ave.Duration=NA,Ave.Cost=NA,Ave.R.Lat=NA,Ave.R.Lon=NA)
-  shipdata <- Convert(shipdata,c(12,13,14,15))
-  Result <- Convert(Result,c(6,7))
-  
-  for(i in 1:nrow(Result)){
-    index <- which(shipdata[,col.zip]==Result[i,1])
-    Result[i,c(8,9,10,11,12,13,14)] <- c(length(index), # uses
-                                         sum(saledata[which(saledata[,col.zip.sale]==Result[i,1]),col.unit]), # units 
-                                         mean(na.omit(shipdata[index,col.distance])), # average distance
-                                         mean(na.omit(shipdata[index,col.duration])), # average duration
-                                         mean(na.omit(shipdata[index,col.cost])),     # average cost
-                                         mean(na.omit(shipdata[which(shipdata[,r.lat]==Result[i,6]),r.lat])),
-                                         mean(na.omit(shipdata[which(shipdata[,r.lon]==Result[i,7]),r.lon]))
-    )
-  }
-  
-  Result <- Sort(Result,9,decreasing = TRUE)
-  return(Result)
-}
-
-# collect and organize data of shipping types, for one product
-CargoTypes <- function(product,          # name of the product
-                       shipdata,         # input shipping data
-                       col.type=6,       # number of the column which contains shipment types in shipdata
-                       col.cost=7,       # column number of the shipping costs in shipdata
-                       col.duration=11,  # in shipdata
-                       col.distance=20){ # in shipdata
-  
-  Result <- data.frame(Product=product,
-                       Type=levels(factor(shipdata[,col.type])),
-                       AverageCost=NA,
-                       TotalUse=NA,
-                       AverageDuration=NA,
-                       TotalCost=NA,
-                       AverageDistance=NA)
-  
-  Result[,3] <- sapply(Result[,2], function(x) mean(shipdata[which(shipdata[,col.type]==x),col.cost])) # average cost
-  Result[,4] <- sapply(Result[,2], function(x) length(which(shipdata[,col.type]==x))) # total uses
-  Result[,5] <- sapply(Result[,2], function(x) mean(na.omit(shipdata[which(shipdata[,col.type]==x),col.duration]))) # ave. dur.
-  Result[,6] <- sapply(Result[,2], function(x) sum(shipdata[which(shipdata[,col.type]==x),col.cost])) # total cost
-  Result[,7] <- sapply(Result[,2], function(x) mean(na.omit(shipdata[which(shipdata[,col.type]==x),col.distance]))) # ave. dist.
-  Result <- Sort(Result,3,decreasing = TRUE)
-  return(Result)
-}
-
-# for easier obtaining of a product's shipping data (NOT tested)
-Partial.ShipData <- function(sonumber,           # complete list of sonumbers
-                             product,            # name of the product, just one name, not a set of names
-                             ship,               # raw ship data, i.e. ShippingData_Mont...txt
-                             col.sonumber=8,     # number of the column containing sonumbers in raw ship data
-                             furtherinfo=FALSE){ # show detailed info 
-  
-  mylevels <- as.character(levels(factor(sonumber))) # see levels of SONumbers
-  
-  # convert to characters for faster searching, then find indexes that contain searched SONumber
-  ShipSONumber <- as.character(ship[,col.sonumber])
-  index <- list(a=c(1,2,3),b=c(1,2)) # arbitrarily initialize, let it store rows with various lengths
-  for(i in 1:length(mylevels))
-    index[[i]] <- which(mylevels[i]==ShipSONumber)
-  print("Indexes determined.")
-  
-  # get corresponding shipping data from indexes
-  temp <- data.frame() # declare a temporary data frame to use in for loop (this make algorithm simplar)
-  Result <- as.data.frame(matrix(NA,nrow=sum(lengths(index,use.names = FALSE)),
-                                 ncol=21)) # preallocate main data frame
-  colnames(Result) <- c("TrackingNumber","Company","ShippingCode","SenderZip","ReceipentZip","Type",
-                        "ShippingCost","SONumber","DateShipped","DateDelivered","Duration","S.Lat",
-                        "S.Lon","R.Lat","R.Lon","S.City","S.StateCode","R.City","R.StateCode",
-                        "Distance","Product")
-  
-  # match data
-  for(i in 1:length(index))
-    temp <- rbind(temp,ship[index[[i]],])
-  
-  Result[,1:11] <- temp # assign it to main data frame
-  print("Base data is extracted from raw shipping data.")
-  
-  # get coordinates as lat and lon from zips
-  Result[,c(12,13)] <- zip.coordinates(Result[,4])[,c(1,2)] # find coordinates of sender zips
-  Result[,c(14,15)] <- zip.coordinates(Result[,5])[,c(1,2)] # find coordinates of receipent zips
-  
-  # get location names from zips
-  Result[,c(16,17)] <- zip.location(Result[,4])[,c(1,2)] # find city/state of sender zips
-  Result[,c(18,19)] <- zip.location(Result[,5])[,c(1,2)] # find city/state of receipent zips
-  
-  # calculate the distance between supplier and customer
-  require(geosphere)
-  Dist <- distHaversine(cbind(as.numeric(Result$S.Lon),as.numeric(Result$S.Lat)),
-                        cbind(as.numeric(Result$R.Lon),as.numeric(Result$R.Lat))) # in meters
-  Result$Distance <- round(Dist/1000,3) # as kilometers
-  Result$Product <- product # add product name to prevent confusions
-  print("Location information is collected.")
-  
-  # further information for BestSeller item's Shipping Data
-  if(furtherinfo){
-    paste("\nFurther information:")
-    paste("There are",levels(factor(Result$Type)),"different shipment types.") # different shipment types
-    paste("Average delivery duration is",mean(na.omit(Result$Duration)),"days.") # average delivery day
-    paste("Average cost for each delivery is",mean(na.omit(Result$ShippingCost)),"USD.") # average cost
-  }
-  return(Result)
-}
-
 # list the best products according to 3 type and number of products, e.g. top 100, top 10 etc.
 Product.List <- function(saledata,          # raw sale data e.g. Month10.txt etc.
                          type="bestseller", # bestseller, mostprofitable or mostordered
-                         limit=110){        # 100 for top 100, or 10 for top 10, selecting this greater than
-                                            # exact number of elements is recommend in orde to exclude
-                                            # unwanted items 
+                         limit=110,         # intentionally taken 10 more. exclude unwanted.for top 100.
+                         savetofile=FALSE,  # save to csv for backup and future recovers
+                         filename="Product_List.csv"){ # filename for probable file write
+  
   # be careful, both data must be white-space trimmed, even the lists must be. 
   products <- data.frame(Name=levels(factor(saledata[,5]))) # see and store how many different products
   saledata$Total <- saledata$UnitsShipped*saledata$AverageUnitPrice # get the profit from that product
@@ -598,6 +480,149 @@ Product.List <- function(saledata,          # raw sale data e.g. Month10.txt etc
             Result <- Sort(Result,5,decreasing = TRUE) # sort w.r.t. profit
           }
   )
+  # save to a csv file as backup
+  if(savetofile)
+    write.csv(Result,file = filename,row.names = FALSE)
+  
+  return(Result)
+}
+
+# for easier obtaining of a product's shipping data (NOT tested)
+Partial.ShipData <- function(sonumber,           # complete list of sonumbers
+                             product,            # name of the product, just one name, not a set of names
+                             ship,               # raw ship data, i.e. ShippingData_Mont...txt
+                             col.sonumber=8,     # number of the column containing sonumbers in raw ship data
+                             furtherinfo=FALSE,  # show detailed info 
+                             savetofile=FALSE,   # save to csv for backup and future recovers
+                             filename="Partial_ShipData.csv"){ # filename for probable file write
+  
+  mylevels <- as.character(levels(factor(sonumber))) # see levels of SONumbers
+  
+  # convert to characters for faster searching, then find indexes that contain searched SONumber
+  ShipSONumber <- as.character(ship[,col.sonumber])
+  index <- list(a=c(1,2,3),b=c(1,2)) # arbitrarily initialize, let it store rows with various lengths
+  for(i in 1:length(mylevels))
+    index[[i]] <- which(mylevels[i]==ShipSONumber)
+  print("Indexes determined.")
+  
+  # get corresponding shipping data from indexes
+  temp <- data.frame() # declare a temporary data frame to use in for loop (this make algorithm simplar)
+  Result <- as.data.frame(matrix(NA,nrow=sum(lengths(index,use.names = FALSE)),
+                                 ncol=21)) # preallocate main data frame
+  colnames(Result) <- c("TrackingNumber","Company","ShippingCode","SenderZip","ReceipentZip","Type",
+                        "ShippingCost","SONumber","DateShipped","DateDelivered","Duration","S.Lat",
+                        "S.Lon","R.Lat","R.Lon","S.City","S.StateCode","R.City","R.StateCode",
+                        "Distance","Product")
+  
+  # match data
+  for(i in 1:length(index))
+    temp <- rbind(temp,ship[index[[i]],])
+  
+  Result[,1:11] <- temp # assign it to main data frame
+  print("Base data is extracted from raw shipping data.")
+  
+  # get coordinates as lat and lon from zips
+  Result[,c(12,13)] <- zip.coordinates(Result[,4])[,c(1,2)] # find coordinates of sender zips
+  Result[,c(14,15)] <- zip.coordinates(Result[,5])[,c(1,2)] # find coordinates of receipent zips
+  
+  # get location names from zips
+  Result[,c(16,17)] <- zip.location(Result[,4])[,c(1,2)] # find city/state of sender zips
+  Result[,c(18,19)] <- zip.location(Result[,5])[,c(1,2)] # find city/state of receipent zips
+  
+  # calculate the distance between supplier and customer
+  require(geosphere)
+  Dist <- distHaversine(cbind(as.numeric(Result$S.Lon),as.numeric(Result$S.Lat)),
+                        cbind(as.numeric(Result$R.Lon),as.numeric(Result$R.Lat))) # in meters
+  Result$Distance <- round(Dist/1000,3) # as kilometers
+  Result$Product <- product # add product name to prevent confusions
+  print("Location information is collected.")
+  
+  # save to a csv file as backup
+  if(savetofile)
+    write.csv(Result,file = filename,row.names = FALSE)
+  
+  # further information for BestSeller item's Shipping Data
+  if(furtherinfo){
+    paste("\nFurther information:")
+    paste("There are",levels(factor(Result$Type)),"different shipment types.") # different shipment types
+    paste("Average delivery duration is",mean(na.omit(Result$Duration)),"days.") # average delivery day
+    paste("Average cost for each delivery is",mean(na.omit(Result$ShippingCost)),"USD.") # average cost
+  }
+  return(Result)
+}
+
+# collect and organize data of shipping types, for one product
+CargoTypes <- function(product,            # name of the product
+                       shipdata,           # input shipping data output of Partial.Shipdata()
+                       col.type=6,         # number of the column which contains shipment types in shipdata
+                       col.cost=7,         # column number of the shipping costs in shipdata
+                       col.duration=11,    # in shipdata
+                       col.distance=20,    # in shipdata
+                       savetofile=FALSE,   # save to csv for backup and future recovers
+                       filename="Cargo_Types.csv"){ # filename for probable file write
+  
+  Result <- data.frame(Product=product,
+                       Type=levels(factor(shipdata[,col.type])),
+                       AverageCost=NA,
+                       TotalUse=NA,
+                       AverageDuration=NA,
+                       TotalCost=NA,
+                       AverageDistance=NA)
+  
+  Result[,3] <- sapply(Result[,2], function(x) mean(shipdata[which(shipdata[,col.type]==x),col.cost])) # average cost
+  Result[,4] <- sapply(Result[,2], function(x) length(which(shipdata[,col.type]==x))) # total uses
+  Result[,5] <- sapply(Result[,2], function(x) mean(na.omit(shipdata[which(shipdata[,col.type]==x),col.duration]))) # ave. dur.
+  Result[,6] <- sapply(Result[,2], function(x) sum(shipdata[which(shipdata[,col.type]==x),col.cost])) # total cost
+  Result[,7] <- sapply(Result[,2], function(x) mean(na.omit(shipdata[which(shipdata[,col.type]==x),col.distance]))) # ave. dist.
+  Result <- Sort(Result,3,decreasing = TRUE)
+  
+  # save to a csv file as backup
+  if(savetofile)
+    write.csv(Result,file = filename,row.names = FALSE)
+  
+  return(Result)
+}
+
+# collect and organize provider's data
+Warehouses <- function(senderzips,       # input levels (or just itself) of supplier postal codes
+                       saledata,         # input sale data
+                       shipdata,         # input shipping data
+                       col.zip=4,        # column number of sender zips in SHIPDATA
+                       col.zip.sale=3,   # column number of sender zips in SALEDATA
+                       col.unit=7,       # col number of units in SALEDATA
+                       col.distance=20,  # col number in shipdata
+                       col.duration=11,  # in shipdata
+                       col.cost=7,       # in shipdata
+                       r.lat=14,         # in shipdata
+                       r.lon=15,         # in shipdata
+                       savetofile=FALSE, # save to csv for backup and future recovers
+                       filename="Warehouses_Data.csv"){ # filename for probable file write
+  
+  if(!exists("Zips")) Zips <- GetZips() # if zip database not exists, import it.
+  
+  Result <- Search.List(as.character(levels(factor(senderzips))),Zips,1)[,-1]
+  Result <- cbind(Result,Uses=NA,Units=NA,Ave.Distance=NA,Ave.Duration=NA,Ave.Cost=NA,Ave.R.Lat=NA,Ave.R.Lon=NA)
+  shipdata <- Convert(shipdata,c(12,13,14,15))
+  Result <- Convert(Result,c(6,7))
+  
+  for(i in 1:nrow(Result)){
+    index <- which(shipdata[,col.zip]==Result[i,1])
+    Result[i,c(8,9,10,11,12,13,14)] <- c(length(index), # uses
+                                         sum(saledata[which(saledata[,col.zip.sale]==Result[i,1]),col.unit]), # units 
+                                         mean(na.omit(shipdata[index,col.distance])), # average distance
+                                         mean(na.omit(shipdata[index,col.duration])), # average duration
+                                         mean(na.omit(shipdata[index,col.cost])),     # average cost
+                                         mean(na.omit(shipdata[which(shipdata[,r.lat]==Result[i,6]),r.lat])),
+                                         mean(na.omit(shipdata[which(shipdata[,r.lon]==Result[i,7]),r.lon]))
+    )
+  }
+  
+  Result <- Sort(Result,9,decreasing = TRUE)
+  
+  # save to a csv file as backup
+  if(savetofile)
+    write.csv(Result,file = filename,row.names = FALSE) # no row.names to prevent possible reading errors
+  
   return(Result)
 }
 

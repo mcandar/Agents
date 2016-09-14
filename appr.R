@@ -481,14 +481,33 @@ Product.List <- function(saledata,          # raw sale data e.g. Month10.txt etc
           }
   )
   # save to a csv file as backup
-  if(savetofile)
-    write.csv(Result,file = filename,row.names = FALSE)
+  if(savetofile){
+    write.csv(Result,file = filename,row.names = FALSE) # no row.names to prevent possible reading errors
+    cat("File",filename,"saved to",getwd(),"\n")
+  }
+  
+  return(Result)
+}
+
+# for matching the data from raw sale data of bestseller or most profitable item etc. 
+Partial.SaleData <- function(product,          # searched product name, just one name not a vector
+                             saledata,         # raw sale data e.g. Month10.txt, Month11.txt etc.
+                             col.itemname=5,   # column that stores product names
+                             savetofile=FALSE, # save to csv for backup and future recovers
+                             filename="Partial_SaleData.csv"){ # filename for probable file write
+  
+  Result <- Search.List(product,saledata,col.itemname)[,-1]
+  # save to a csv file as backup
+  if(savetofile){
+    write.csv(Result,file = filename,row.names = FALSE) # no row.names to prevent possible reading errors
+    cat("File",filename,"saved to",getwd(),"\n")
+  }
   
   return(Result)
 }
 
 # for easier obtaining of a product's shipping data (NOT tested)
-Partial.ShipData <- function(sonumber,           # complete list of sonumbers
+Partial.ShipData <- function(sonumber,           # sonumbers of SALEDATA (output of Partial.SaleData) NOT Rawdata
                              product,            # name of the product, just one name, not a set of names
                              ship,               # raw ship data, i.e. ShippingData_Mont...txt
                              col.sonumber=8,     # number of the column containing sonumbers in raw ship data
@@ -538,8 +557,10 @@ Partial.ShipData <- function(sonumber,           # complete list of sonumbers
   print("Location information is collected.")
   
   # save to a csv file as backup
-  if(savetofile)
-    write.csv(Result,file = filename,row.names = FALSE)
+  if(savetofile){
+    write.csv(Result,file = filename,row.names = FALSE) # no row.names to prevent possible reading errors
+    cat("File",filename,"saved to",getwd(),"\n")
+  }
   
   # further information for BestSeller item's Shipping Data
   if(furtherinfo){
@@ -577,16 +598,18 @@ CargoTypes <- function(product,            # name of the product
   Result <- Sort(Result,3,decreasing = TRUE)
   
   # save to a csv file as backup
-  if(savetofile)
-    write.csv(Result,file = filename,row.names = FALSE)
+  if(savetofile){
+    write.csv(Result,file = filename,row.names = FALSE) # no row.names to prevent possible reading errors
+    cat("File",filename,"saved to",getwd(),"\n")
+  }
   
   return(Result)
 }
 
 # collect and organize provider's data
-Warehouses <- function(senderzips,       # input levels (or just itself) of supplier postal codes
-                       saledata,         # input sale data
-                       shipdata,         # input shipping data
+Warehouses <- function(senderzips,       # sender zips of saledata (output of Partial.SaleData())
+                       saledata,         # input sale data (NOT Raw sale data)
+                       shipdata,         # input shipping data (NOT raw shipping data)
                        col.zip=4,        # column number of sender zips in SHIPDATA
                        col.zip.sale=3,   # column number of sender zips in SALEDATA
                        col.unit=7,       # col number of units in SALEDATA
@@ -620,8 +643,10 @@ Warehouses <- function(senderzips,       # input levels (or just itself) of supp
   Result <- Sort(Result,9,decreasing = TRUE)
   
   # save to a csv file as backup
-  if(savetofile)
+  if(savetofile){
     write.csv(Result,file = filename,row.names = FALSE) # no row.names to prevent possible reading errors
+    cat("File",filename,"saved to",getwd(),"\n")
+  }
   
   return(Result)
 }

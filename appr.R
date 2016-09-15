@@ -465,12 +465,12 @@ Product.List <- function(saledata,          # raw sale data e.g. Month10.txt etc
                          filename="Product_List.csv", # filename for probable file write
                          samp.perc=20){ # percentage of sample taken initially
   
+  saledata$Total <- saledata$UnitsShipped*saledata$AverageUnitPrice # get the profit from that product
   # take a 20% sample
   # aim is to pull out significant names from sample, since focus is top products
   sample.saledata <- saledata[sample(nrow(saledata),round((nrow(saledata)/100)*samp.perc)),]
   # be careful, both data must be white-space trimmed, even the lists must be. 
   products <- data.frame(Name=as.character(levels(factor(sample.saledata[,5])))) # see and store how many different products
-  saledata$Total <- saledata$UnitsShipped*saledata$AverageUnitPrice # get the profit from that product
   switch (type,
           "bestseller" = {
             # ad hoc quantity values, just for faster listing

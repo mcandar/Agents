@@ -431,53 +431,65 @@ zip.location <- function(x){
   return(Result)
 }
 
+# just input a list of product names (but as levels, each element should be unique in list) and let it search
+# this function is focused on collecting the data of top items such as bestseller or most profitable, please note that
+# it does not find bestseller or else, it just extracts corresponding info of the given items from raw sale data
+TopItems.List <- function(products,     # top items name list e.g. bestseller 10. (must be a data frame)
+                          saledata,     # raw sale data e.g. Month10.txt, Month11.txt, etc.
+                          type="bestseller", # needed for final sorting
+                          col.unit=7,   # column of unitsshipped in raw sale data
+                          col.total=9,  # column of total profit, after binded to the raw sale data
+                          col.price=8){ # column of prices in raw sale data
+  
+  Result <- data.frame(Name=products,Quantity=NA,Profit=NA,Price=NA,Orders=NA)
+  for(i in 1:nrow(Result)){
+    index <- which(saledata[,5] == Result[i,1])
+    Result[i,c(2,3,4,5)]<- c(sum(saledata[index,col.unit]), # sold quantity
+                             sum(saledata[index,col.total]), # total profit from that item
+                             saledata[index[1],col.price],   # price of the item
+                             length(index))          # number of orders
+  }
+  switch (type,
+          "bestseller" = Result <- Sort(Result,2,decreasing = TRUE), # sort w.r.t. quantity
+          "mostprofitable" = Result <- Sort(Result,3,decreasing = TRUE), # sort w.r.t. profit
+          "mostordered" = Result <- Sort(Result,5,decreasing = TRUE) # sort w.r.t. number of orders
+  )
+  return(Result)
+}
+
 # list the best products according to 3 type and number of products, e.g. top 100, top 10 etc.
 Product.List <- function(saledata,          # raw sale data e.g. Month10.txt etc.
                          type="bestseller", # bestseller, mostprofitable or mostordered
-                         limit=110,         # intentionally taken 10 more. exclude unwanted.for top 100.
+                         limit=15,         # intentionally taken 10 more. exclude unwanted.for top 100.
                          savetofile=FALSE,  # save to csv for backup and future recovers
-                         filename="Product_List.csv"){ # filename for probable file write
+                         filename="Product_List.csv", # filename for probable file write
+                         samp.perc=20){ # percentage of sample taken initially
   
+  # take a 20% sample
+  # aim is to pull out significant names from sample, since focus is top products
+  sample.saledata <- saledata[sample(nrow(saledata),round((nrow(saledata)/100)*samp.perc)),]
   # be careful, both data must be white-space trimmed, even the lists must be. 
-  products <- data.frame(Name=levels(factor(saledata[,5]))) # see and store how many different products
+  products <- data.frame(Name=as.character(levels(factor(sample.saledata[,5])))) # see and store how many different products
   saledata$Total <- saledata$UnitsShipped*saledata$AverageUnitPrice # get the profit from that product
   switch (type,
           "bestseller" = {
-            #following line of code is like a for loop, calculates how much an item sold
-            products$Quantity <- sapply(products[,1],function(x) sum(saledata[which(saledata[,5] == x),7])) # rowwise
-            temp <- Sort(products,2,decreasing = TRUE)[1:limit,] # get the sorted array, name and quantity
-            Result <- data.frame(Name=temp[,1],Quantity=temp[,2],Profit=NA,Price=NA,Orders=NA)
-            for(i in 1:nrow(Result)){
-              index <- which(saledata[,5] == Result[i,1])
-              Result[i,c(3,4,5)]<- c(sum(saledata[index,9]), # total profit from that item
-                                     saledata[index[1],8],   # price of the item
-                                     length(index))          # number of orders
-            }
-            Result <- Sort(Result,2,decreasing = TRUE) # sort w.r.t. quantity
+            # ad hoc quantity values, just for faster listing
+            products$Quantity <- sapply(products[,1],
+                                        function(x) sum(sample.saledata[which(sample.saledata[,5] == x),7])) # rowwise
+            Result <- TopItems.List(products = Sort(products,2,decreasing = TRUE)[1:limit,1],
+                                    saledata = saledata,type = "bestseller")
           },
           "mostprofitable" = {
-            products$Profit <- sapply(products[,1],function(x) sum(saledata[which(saledata[,5] == x),9])) # rowwise
-            temp <- Sort(products,2,decreasing = TRUE)[1:limit,] # get the sorted array, name and profit
-            Result <- data.frame(Name=temp[,1],Quantity=NA,Profit=temp[,2],Price=NA,Orders=NA)
-            for(i in 1:nrow(Result)){
-              index <- which(saledata[,5] == Result[i,1])
-              Result[i,c(2,4,5)]<- c(sum(saledata[index,7]), # sold quantity
-                                     saledata[index[1],8],   # price of the item
-                                     length(index))          # number of orders
-            }
-            Result <- Sort(Result,3,decreasing = TRUE) # sort w.r.t. profit
+            products$Profit <- sapply(products[,1],
+                                      function(x) sum(sample.saledata[which(sample.saledata[,5] == x),9])) # rowwise
+            Result <- TopItems.List(products = Sort(products,2,decreasing = TRUE)[1:limit,1],
+                                    saledata = saledata,type = "mostprofitable")
           },
           "mostordered" = {
-            products[,2] <- sapply(products[,1],function(x) length(which(saledata[,5] == x)))
-            temp <- Sort(products,2,decreasing = TRUE)[1:limit,] # get the sorted array, name and orders
-            Result <- data.frame(Name=temp[,1],Quantity=NA,Profit=NA,Price=NA,Orders=temp[,2])
-            for(i in 1:nrow(Result)){
-              index <- which(saledata[,5] == Result[i,1])
-              Result[i,c(3,4,2)]<- c(sum(saledata[index,9]), # total profit from that item
-                                     saledata[index[1],8],   # price of the item
-                                     sum(saledata[index,7])) # sold quantity
-            }
-            Result <- Sort(Result,5,decreasing = TRUE) # sort w.r.t. profit
+            products[,2] <- sapply(products[,1],
+                                   function(x) length(which(sample.saledata[,5] == x)))
+            Result <- TopItems.List(products = Sort(products,2,decreasing = TRUE)[1:limit,1],
+                                    saledata = saledata,type = "mostordered")
           }
   )
   # save to a csv file as backup
@@ -485,7 +497,6 @@ Product.List <- function(saledata,          # raw sale data e.g. Month10.txt etc
     write.csv(Result,file = filename,row.names = FALSE) # no row.names to prevent possible reading errors
     cat("File",filename,"saved to",getwd(),"\n")
   }
-  
   return(Result)
 }
 

@@ -1,5 +1,5 @@
 import numpy as np
-import timeit
+import time
 
 b = np.zeros((10,10))
 
@@ -8,11 +8,11 @@ for i in range(0,10):
     for j in range(0,10):
         b[i,j] = n
         n = n + 1
-print(b)
 c = b
 
-start = timeit.timeit()
+start = time.clock()
 for i in range(0,10^5):
     d = np.dot(b,c)
-end = timeit.timeit()
+end = time.clock()
+print(d)
 print ("10^5 number of simulations take ", end - start, " seconds.")

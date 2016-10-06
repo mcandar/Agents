@@ -1,12 +1,12 @@
-### ----------------------------------------------------------------------- ###
-### - Contains function recipes for analyzing 6 months data of newegg.com - ###
-### - Author     : Mert Candar -------------------------------------------- ###
-### - Study      : Predictive Modelling with Machine Learning ------------- ###
-### - Class      : Advanced Physics Project Lab --------------------------- ###
-### - Supervisor : Altan Cakir -------------------------------------------- ###
-### - Department of Physics Engineering, Istanbul Technical University ---- ###
-### - Istanbul, Turkey ---------------------------------------------------- ###
-### ----------------------------------------------------------------------- ###
+### --------------------------------------------------------------------------------- ###
+### - Contains function recipes for analyzing second half data of 2012 of Company B - ###
+### - Author     : Mert Candar ------------------------------------------------------ ###
+### - Study      : Predictive Modelling with Machine Learning ----------------------- ###
+### - Class      : Advanced Physics Project Lab ------------------------------------- ###
+### - Supervisor : Altan Cakir ------------------------------------------------------ ###
+### - Department of Physics Engineering, Istanbul Technical University -------------- ###
+### - Istanbul, Turkey -------------------------------------------------------------- ###
+### --------------------------------------------------------------------------------- ###
 
 ## Copy-paste following line to import the content directly from github ##
 # source("https://raw.githubusercontent.com/mcandar/Agents/master/appr.R")
@@ -384,6 +384,7 @@ CheckDevices <- function(){
     cat("Warning: Devices",names(devs),"are not available.\n")
   else 
     cat("All devices are properly working.")
+  return(temp)
 }
 
 # following function checks whether a given coordinate is inside USA borders, the reason it has a switch()
@@ -457,7 +458,7 @@ TopItems.List <- function(products,     # top items name list e.g. bestseller 10
   return(Result)
 }
 
-# list the best products according to 3 type and number of products, e.g. top 100, top 10 etc.
+# list the best products according to 3 types and number of products, e.g. top 100, top 10 etc.
 Product.List <- function(saledata,          # raw sale data e.g. Month10.txt etc.
                          type="bestseller", # bestseller, mostprofitable or mostordered
                          limit=15,         # intentionally taken 10 more. exclude unwanted.for top 100.
@@ -501,7 +502,7 @@ Product.List <- function(saledata,          # raw sale data e.g. Month10.txt etc
 }
 
 # for matching the data from raw sale data of bestseller or most profitable item etc. 
-Partial.SaleData <- function(product,          # searched product name, just one name not a vector
+Partial.SaleData <- function(product,          # searched product name, can be a vector
                              saledata,         # raw sale data e.g. Month10.txt, Month11.txt etc.
                              col.itemname=5,   # column that stores product names
                              savetofile=FALSE, # save to csv for backup and future recovers
@@ -581,6 +582,99 @@ Partial.ShipData <- function(sonumber,           # sonumbers of SALEDATA (output
     paste("Average cost for each delivery is",mean(na.omit(Result$ShippingCost)),"USD.") # average cost
   }
   return(Result)
+}
+
+# for easier obtaining of a product's shipping data (NOT tested)
+Partial.ShipData.List <- function(saledata,           # output of Partial.ShipData(), can include various product names
+                                  ship,               # raw ship data, i.e. ShippingData_Mont...txt
+                                  sale.sonumber=1,    # column index of SONumbers in saledata
+                                  sale.product=5,     # column index of product names in saledata
+                                  col.sonumber=8,     # number of the column containing sonumbers in raw ship data
+                                  furtherinfo=FALSE,  # show detailed info 
+                                  savetofile=FALSE,   # save to csv for backup and future recovers
+                                  filename="Partial_ShipData.csv"){ # filename for probable file write
+  
+  Output <- as.data.frame(matrix(NA,nrow=sum(lengths(index,use.names = FALSE)),
+                                 ncol=21)) # preallocate main data frame, this will be final output
+  colnames(Output) <- c("TrackingNumber","Company","ShippingCode","SenderZip","ReceipentZip","Type",
+                        "ShippingCost","SONumber","DateShipped","DateDelivered","Duration","S.Lat",
+                        "S.Lon","R.Lat","R.Lon","S.City","S.StateCode","R.City","R.StateCode",
+                        "Distance","Product")
+  
+  prods <- list(a=c(1,2,3),b=c(1,2)) # just initialize a list. needed for a list with varying row lengths
+  prodlevels <- as.character(levels(factor(saledata[,sale.product]))) # levels of names
+  SaleSONumber <- as.character(saledata[,sale.product])
+  for(i in 1:length(prodlevels)) # find indexes, to form corresponding "saledata" for each product
+    prods[[i]] <- which(SaleSONumber==prodlevels[i]) # store indexes
+  # cat("Length of prodlevels :",length(prodlevels),"\n")
+  # perform data collection for each item, rbind() them respectively, main loop.
+  # note that one loop corresponds to one item
+  for(j in 1:length(prods)){
+    mylevels <- as.character(levels(factor(saledata[prods[[j]],sale.sonumber]))) # store levels of SONumbers
+    # cat("Length of mylevels :",length(mylevels),"\n")
+    product <- prodlevels[j]
+    # convert to characters for faster searching, then find indexes that contain searched SONumber
+    ShipSONumber <- as.character(ship[,col.sonumber])
+    index <- list(a=c(1,2,3),b=c(1,2)) # arbitrarily initialize, let it store rows with various lengths
+    for(i in 1:length(mylevels))
+      index[[i]] <- which(mylevels[i]==ShipSONumber) # each element corresponds to a row of result matrix
+    print("Indexes determined.")
+    
+    # get corresponding shipping data from indexes
+    temp <- data.frame() # declare a temporary data frame to use in for loop (this make algorithm simplar)
+    Result <- as.data.frame(matrix(NA,nrow=sum(lengths(index,use.names = FALSE)),
+                                   ncol=21)) # preallocate main data frame
+    colnames(Result) <- c("TrackingNumber","Company","ShippingCode","SenderZip","ReceipentZip","Type",
+                          "ShippingCost","SONumber","DateShipped","DateDelivered","Duration","S.Lat",
+                          "S.Lon","R.Lat","R.Lon","S.City","S.StateCode","R.City","R.StateCode",
+                          "Distance","Product")
+    
+    # match data
+    for(i in 1:length(index))
+      temp <- rbind(temp,ship[index[[i]],])
+    
+    Result[,1:11] <- temp # assign it to main data frame, for first 11 columns
+    print("Base data is extracted from raw shipping data.")
+    
+    # get coordinates as lat and lon from zips
+    Result[,c(12,13)] <- zip.coordinates(Result[,4])[,c(1,2)] # find coordinates of sender zips
+    Result[,c(14,15)] <- zip.coordinates(Result[,5])[,c(1,2)] # find coordinates of receipent zips
+    
+    # get location names from zips
+    Result[,c(16,17)] <- zip.location(Result[,4])[,c(1,2)] # find city/state of sender zips
+    Result[,c(18,19)] <- zip.location(Result[,5])[,c(1,2)] # find city/state of receipent zips
+    write.csv(Result,"Result.csv",row.names = FALSE) # test and to be deleted
+    # calculate the distance between supplier and customer
+    require(geosphere)
+    ### There is and error at this function
+    Dist <- distHaversine(cbind(as.numeric(Result$S.Lon),as.numeric(Result$S.Lat)),
+                          cbind(as.numeric(Result$R.Lon),as.numeric(Result$R.Lat))) # in meters
+    ### 
+    # print("Test: Each distance is calculated.") # test
+    Result$Distance <- round(Dist/1000,3) # as kilometers
+    # print("Test: Distance values matched.") # test
+    Result$Product <- product # add product name to prevent confusion
+    # Result$Product <- rep(product,sum(lengths(index,use.names = FALSE))) # add product name to prevent confusion
+    # print("Test: Product names listed.") # test
+    print("Location information is collected.")
+    
+    Output <- rbind(Output,Result)
+  }
+  
+  # save to a csv file as backup
+  if(savetofile){
+    write.csv(Output,file = filename,row.names = FALSE) # no row.names to prevent possible reading errors
+    cat("File",filename,"saved to",getwd(),"\n")
+  }
+  
+  # further information for BestSeller item's Shipping Data
+  if(furtherinfo){
+    paste("\nFurther information:")
+    paste("There are",levels(factor(Output$Type)),"different shipment types.") # different shipment types
+    paste("Average delivery duration is",mean(na.omit(Output$Duration)),"days.") # average delivery day
+    paste("Average cost for each delivery is",mean(na.omit(Output$ShippingCost)),"USD.") # average cost
+  }
+  return(Output)
 }
 
 # collect and organize data of shipping types, for one product

@@ -816,6 +816,88 @@ levels.ship <- function(data,col.type=6,col.cost=7,col.duration=11,distances=FAL
   return(Result)
 }
 
+
+### FOLLOWING FUNCTIONS SHOULD BE TESTED! ###
+  # this function is for filtering and gathering location information about shipping data
+  Filter.ShippingData <- function(Ship, # input raw shipping data after it is formatted with Format.ShipData()
+                                  location.info=TRUE, # in order to collect location lat/lon info about a row
+                                  file.write=TRUE, # true if you want to save to csv file
+                                  file.name="Shipping_Filtered.csv" # name of the file to be written
+                                  ){
+    # Filter
+    Result <- Ship[-which(Ship$ShippingCost==0),] # filter by cost, exclude transactions with no cost
+    Result <- Result[-which(Result$Type == "UPS Ground"),] # filter by type, exclude UPS Ground shipping
+    
+    # Further filtrate according to shipping types
+    typeinfo <- levels.ship(Result,distances = FALSE) # get shipping type information
+    print(typeinfo)
+    
+    # determine to pull out
+    print("According to shipping types, take the corresponding data of rows :")
+    from <- as.integer(readline(prompt="from : ")) # from which row
+    to <- as.integer(readline(prompt="to : ")) # to which row
+    Result <- Result[which(Result$Type %in% typeinfo[from:to,1]),] # filter by type
+    
+    # Collect data for locations
+    if(location.info)
+      Result <- cbind(Result,LocationData(Result)) # column-bind them together
+    
+    # Export to csv file
+    if(file.write){
+      write.csv(Result,file.name,row.names = FALSE)
+      cat("File",file.name,"is saved to",getwd(),"\n")
+    }
+    
+    return(Result)
+  }
+  
+  
+  # input ultimate filtered and location data included shipping data, for ONE quarter, and input number of the month and 
+  # raw sale data, this function will match shipping data with sale data, and create a one merged data.
+  Match.ShipData <- function(shipfiltered, # ultimate filtered and location data included shipping data 20 columns
+                             month, # input a month number as integer
+                             saledata, # raw sale data e.g. Month10.txt, Month11.txt etc.
+                             iterations = 10, # number of part to divide into when computing
+                             filename = "Most_Expensive_Matched_M11_", # file name to be saved
+                             begin = 1, # beginning of the for loop, could be continued from other steps
+                             ship.sonumber = 8, # sonumber column in filtered shipping data
+                             sale.sonumber = 1 # sonumber column in filtered sale data
+  ){
+    require("lubridate")
+    # create a directory for tidier work
+    main_path <- getwd() # "C:/Users/USER/Desktop/R"
+    current_path <- paste(getwd(),paste("DataMatch",sample(100,1),sep="_"),sep = "/") # folder names
+    dir.create(current_path) # create a new directory to store files
+    setwd(current_path) # set new working directory
+    
+    # pull out just one month, and sort according to shipping cost
+    temp_ship <- Sort(shipfiltered[which(month(shipfiltered$DateShipped)==as.integer(month)),],7,decreasing = TRUE)
+    temp_raw <- Search.List(temp_ship[,ship.sonumber],saledata,ship.sonumber)[,-1] # get corresponding rows of saledata, by sonumber
+    rows <- nrow(temp_ship) # get number of rows to use in following for loop
+    ## divide into fractions and then unify into one big file, for Month10.txt
+    for(i in begin:iterations){
+      cat("Step",i,"\n")
+      index <- seq((i-1)*(rows/it)+1,i*(rows/it)) # determine interval of indexes
+      test_match <- Match.rows(temp_ship[index,],ship.sonumber,temp_raw,ship.sonumber) # match data and bind together as a data frame
+      check_sen <- test_match[,4]==test_match[,23] & test_match[,5]==test_match[,24] # check receipent and sender zips whether they match
+      test_match <- test_match[check_sen,] # take only who match by zips
+      write.csv(test_match,paste(filename,i,".csv",sep = ""),row.names = FALSE) # write to file with order
+      cat("File",paste(filename,i,".csv",sep = ""),"is saved to",getwd(),"\n") # inform user
+    }
+    
+    Result <- data.frame()
+    for(i in 1:iterations)
+      Result <- rbind(Result,read.csv(paste(filename,i,".csv",sep = ""),row.names = NULL))
+    
+    setwd(main_path) # reset working directory
+    write.csv(Result,paste(filename,".csv",sep = ""),row.names = FALSE)
+    cat("File",paste(filename,".csv",sep = ""),"is saved to",getwd(),"\n") # inform user
+    
+    return(Result)
+  }
+### ABOVE 2 FUNCTIONS SHOULD BE TESTED! ###
+  
+
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###
 ### ----------------------------------------------------------------------- ###

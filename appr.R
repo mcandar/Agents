@@ -593,7 +593,8 @@ Partial.ShipData.List <- function(saledata,           # output of Partial.ShipDa
                                   furtherinfo=FALSE,  # show detailed info 
                                   savetofile=FALSE,   # save to csv for backup and future recovers
                                   filename="Partial_ShipData.csv"){ # filename for probable file write
-  
+  require(geosphere)
+  if(!exists("Zips")) Zips <- GetZips() # if zip database does not exists, import it.
   Output <- as.data.frame(matrix(NA,nrow=sum(lengths(index,use.names = FALSE)),
                                  ncol=21)) # preallocate main data frame, this will be final output
   colnames(Output) <- c("TrackingNumber","Company","ShippingCode","SenderZip","ReceipentZip","Type",
@@ -601,17 +602,16 @@ Partial.ShipData.List <- function(saledata,           # output of Partial.ShipDa
                         "S.Lon","R.Lat","R.Lon","S.City","S.StateCode","R.City","R.StateCode",
                         "Distance","Product")
   
-  prods <- list(a=c(1,2,3),b=c(1,2)) # just initialize a list. needed for a list with varying row lengths
+  prods <- list(a=c(1,2,3),b=c(1,2)) # just initialize a list. needed for a list with varying row lengths.
   prodlevels <- as.character(levels(factor(saledata[,sale.product]))) # levels of names
   SaleSONumber <- as.character(saledata[,sale.product])
   for(i in 1:length(prodlevels)) # find indexes, to form corresponding "saledata" for each product
     prods[[i]] <- which(SaleSONumber==prodlevels[i]) # store indexes
-  # cat("Length of prodlevels :",length(prodlevels),"\n")
+  
   # perform data collection for each item, rbind() them respectively, main loop.
   # note that one loop corresponds to one item
   for(j in 1:length(prods)){
     mylevels <- as.character(levels(factor(saledata[prods[[j]],sale.sonumber]))) # store levels of SONumbers
-    # cat("Length of mylevels :",length(mylevels),"\n")
     product <- prodlevels[j]
     # convert to characters for faster searching, then find indexes that contain searched SONumber
     ShipSONumber <- as.character(ship[,col.sonumber])
@@ -637,25 +637,19 @@ Partial.ShipData.List <- function(saledata,           # output of Partial.ShipDa
     print("Base data is extracted from raw shipping data.")
     
     # get coordinates as lat and lon from zips
-    Result[,c(12,13)] <- zip.coordinates(Result[,4])[,c(1,2)] # find coordinates of sender zips
-    Result[,c(14,15)] <- zip.coordinates(Result[,5])[,c(1,2)] # find coordinates of receipent zips
-    
-    # get location names from zips
-    Result[,c(16,17)] <- zip.location(Result[,4])[,c(1,2)] # find city/state of sender zips
-    Result[,c(18,19)] <- zip.location(Result[,5])[,c(1,2)] # find city/state of receipent zips
-    write.csv(Result,"Result.csv",row.names = FALSE) # test and to be deleted
-    # calculate the distance between supplier and customer
-    require(geosphere)
-    ### There is and error at this function
-    Dist <- distHaversine(cbind(as.numeric(Result$S.Lon),as.numeric(Result$S.Lat)),
-                          cbind(as.numeric(Result$R.Lon),as.numeric(Result$R.Lat))) # in meters
-    ### 
-    # print("Test: Each distance is calculated.") # test
-    Result$Distance <- round(Dist/1000,3) # as kilometers
-    # print("Test: Distance values matched.") # test
+    Result[,12:20] <- LocationData(Result)
+    # Result[,c(12,13)] <- zip.coordinates(Result[,4])[,c(1,2)] # find coordinates of sender zips
+    # Result[,c(14,15)] <- zip.coordinates(Result[,5])[,c(1,2)] # find coordinates of receipent zips
+    # 
+    # # get location names from zips
+    # Result[,c(16,17)] <- zip.location(Result[,4])[,c(1,2)] # find city/state of sender zips
+    # Result[,c(18,19)] <- zip.location(Result[,5])[,c(1,2)] # find city/state of receipent zips
+    # 
+    # # calculate the distance between supplier and customer
+    # Dist <- distHaversine(cbind(as.numeric(Result$S.Lon),as.numeric(Result$S.Lat)),
+    #                       cbind(as.numeric(Result$R.Lon),as.numeric(Result$R.Lat))) # in meters
+    # Result$Distance <- round(Dist/1000,3) # as kilometers
     Result$Product <- product # add product name to prevent confusion
-    # Result$Product <- rep(product,sum(lengths(index,use.names = FALSE))) # add product name to prevent confusion
-    # print("Test: Product names listed.") # test
     print("Location information is collected.")
     
     Output <- rbind(Output,Result)
@@ -675,6 +669,33 @@ Partial.ShipData.List <- function(saledata,           # output of Partial.ShipDa
     paste("Average cost for each delivery is",mean(na.omit(Output$ShippingCost)),"USD.") # average cost
   }
   return(Output)
+}
+
+# find lat,lon,city,state and distance values for a given set of zip codes
+# initially, the content of the function was a part of partial.shipdata() function but later
+# it was extracted to make available for external uses.
+LocationData <- function(data,       # can be raw shipdata or saledata, or any type of data containing zip codes
+                         col.sen=4,  # column number of sender zips
+                         col.rec=5){ # column number of receipent zips
+  
+  require(geosphere)
+  if(!exists("Zips")) Zips <- GetZips() # if zip database does not exists, import it.
+  Result <- as.data.frame(matrix(NA,nrow(data),9)) # preallocate output matrix
+  colnames(Result) <- c("S.Lat","S.Lon","R.Lat","R.Lon","S.City","S.StateCode","R.City","R.StateCode",
+                        "Distance")
+  # get coordinates as lat and lon from zips
+  Result[,c(1,2)] <- zip.coordinates(data[,col.sen])[,c(1,2)] # find coordinates of sender zips
+  Result[,c(3,4)] <- zip.coordinates(data[,col.rec])[,c(1,2)] # find coordinates of receipent zips
+  
+  # get location names from zips
+  Result[,c(5,6)] <- zip.location(data[,col.sen])[,c(1,2)] # find city/state of sender zips
+  Result[,c(7,8)] <- zip.location(data[,col.rec])[,c(1,2)] # find city/state of receipent zips
+  
+  # calculate the distance between supplier and customer
+  Dist <- distHaversine(cbind(as.numeric(Result$S.Lon),as.numeric(Result$S.Lat)),
+                        cbind(as.numeric(Result$R.Lon),as.numeric(Result$R.Lat))) # in meters
+  Result[,9] <- round(Dist/1000,3) # as kilometers
+  return(Result)
 }
 
 # collect and organize data of shipping types, for one product
@@ -753,6 +774,45 @@ Warehouses <- function(senderzips,       # sender zips of saledata (output of Pa
     cat("File",filename,"saved to",getwd(),"\n")
   }
   
+  return(Result)
+}
+
+# match two given data set
+Match.rows <- function(source,col.sou,target,col.tar){
+  Result <- data.frame() # initialize a data frame to fill in later
+  for(i in 1:length(source[,col.sou])){
+    index <- which(target[,col.tar]==source[i,col.sou]) # search the source in target, get indexes
+    len <- length(index) # store how many times it is encountered
+    if(len!=0){ # if found
+      for(j in 1:len)
+        Result <- rbind(Result,cbind(source[i,],target[index[[j]],])) # write corresponding matches
+    }
+    else if(len==0){ # if could not be found
+      temp <- matrix(NA,1,ncol(target))
+      colnames(temp) <- colnames(target)
+      Result <- rbind(Result,cbind(source[i,],temp)) # fill with NA's
+    }
+  }
+  return(Result)
+}
+
+# this function is needed for filtering the shipping data. it gathers information about shipping types and one can decide
+# which type of shipping should be excluded.
+levels.ship <- function(data,col.type=6,col.cost=7,col.duration=11,distances=FALSE){
+  Result <- as.data.frame(levels(factor(data[,col.type])))
+  Result$AveCost <- sapply(Result[,1],function(x) mean(na.omit(data[which(data[,col.type]==x),col.cost])))
+  Result$TotalCost <- sapply(Result[,1],function(x) sum(na.omit(data[which(data[,col.type]==x),col.cost])))
+  Result$AveDuration <- sapply(Result[,1],function(x) mean(na.omit(data[which(data[,col.type]==x),col.duration])))
+  Result$Uses <- sapply(Result[,1],function(x) length(which(data$Type==x)))
+  if(distances){
+    Result$Distance <- sapply(Result[,1],function(x) mean(na.omit(data[which(data[,col.type] == x),20])))
+    Result$Index <- Result$Distance/(Result$AveCost*Result$AveDuration)
+    colnames(Result) <- c("Type","AveCost","TotalCost","AveDuration","Uses","Distance","Index")
+  }
+  else{
+    colnames(Result) <- c("Type","AveCost","TotalCost","AveDuration","Uses") 
+  }
+  Result <- Sort(Result,2,decreasing = TRUE)
   return(Result)
 }
 

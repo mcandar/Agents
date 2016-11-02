@@ -877,7 +877,7 @@ levels.ship <- function(data,col.type=6,col.cost=7,col.duration=11,distances=FAL
     ## divide into fractions and then unify into one big file, for Month10.txt
     for(i in begin:iterations){
       cat("Step",i,"\n")
-      index <- seq((i-1)*(rows/it)+1,i*(rows/it)) # determine interval of indexes
+      index <- seq((i-1)*(rows/iterations)+1,i*(rows/iterations)) # determine interval of indexes
       test_match <- Match.rows(temp_ship[index,],ship.sonumber,temp_raw,ship.sonumber) # match data and bind together as a data frame
       check_sen <- test_match[,4]==test_match[,23] & test_match[,5]==test_match[,24] # check receipent and sender zips whether they match
       test_match <- test_match[check_sen,] # take only who match by zips

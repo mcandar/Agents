@@ -407,7 +407,8 @@ Search.List <- function(source,target,col){
   Result <- data.frame() # initialize a data frame to fill in later
   for(i in 1:length(source)){
     index <- which(target[,col]==source[i]) # search the source in target, get indexes
-    Result <- rbind(Result,cbind(rep(source[i],length(index)),target[index,])) #
+    if(length(index)!=0) # if found
+      Result <- rbind(Result,cbind(rep(source[i],length(index)),target[index,])) #
   }
   return(Result)
 }
@@ -786,6 +787,7 @@ Match.rows <- function(source,col.sou,target,col.tar){
     if(len!=0){ # if found
       for(j in 1:len)
         Result <- rbind(Result,cbind(source[i,],target[index[[j]],])) # write corresponding matches
+      target <- target[-index,] # exclude elements that has been listed, (on test)
     }
     else if(len==0){ # if could not be found
       temp <- matrix(NA,1,ncol(target))
@@ -817,41 +819,41 @@ levels.ship <- function(data,col.type=6,col.cost=7,col.duration=11,distances=FAL
 }
 
 
-### FOLLOWING FUNCTIONS SHOULD BE TESTED! ###
-  # this function is for filtering and gathering location information about shipping data
-  Filter.ShippingData <- function(Ship, # input raw shipping data after it is formatted with Format.ShipData()
-                                  location.info=TRUE, # in order to collect location lat/lon info about a row
-                                  file.write=TRUE, # true if you want to save to csv file
-                                  file.name="Shipping_Filtered.csv" # name of the file to be written
-                                  ){
-    # Filter
-    Result <- Ship[-which(Ship$ShippingCost==0),] # filter by cost, exclude transactions with no cost
-    Result <- Result[-which(Result$Type == "UPS Ground"),] # filter by type, exclude UPS Ground shipping
-    
-    # Further filtrate according to shipping types
-    typeinfo <- levels.ship(Result,distances = FALSE) # get shipping type information
-    print(typeinfo)
-    
-    # determine to pull out
-    print("According to shipping types, take the corresponding data of rows :")
-    from <- as.integer(readline(prompt="from : ")) # from which row
-    to <- as.integer(readline(prompt="to : ")) # to which row
-    Result <- Result[which(Result$Type %in% typeinfo[from:to,1]),] # filter by type
-    
-    # Collect data for locations
-    if(location.info)
-      Result <- cbind(Result,LocationData(Result)) # column-bind them together
-    
-    # Export to csv file
-    if(file.write){
-      write.csv(Result,file.name,row.names = FALSE)
-      cat("File",file.name,"is saved to",getwd(),"\n")
-    }
-    
-    return(Result)
+
+# this function is for filtering and gathering location information about shipping data
+Filter.ShippingData <- function(Ship, # input raw shipping data after it is formatted with Format.ShipData()
+                                location.info=TRUE, # in order to collect location lat/lon info about a row
+                                file.write=TRUE, # true if you want to save to csv file
+                                file.name="Shipping_Filtered.csv" # name of the file to be written
+){
+  # Filter
+  Result <- Ship[-which(Ship$ShippingCost==0),] # filter by cost, exclude transactions with no cost
+  Result <- Result[-which(Result$Type == "UPS Ground"),] # filter by type, exclude UPS Ground shipping
+  
+  # Further filtrate according to shipping types
+  typeinfo <- levels.ship(Result,distances = FALSE) # get shipping type information
+  print(typeinfo)
+  
+  # determine to pull out
+  print("According to shipping types, take the corresponding data of rows :")
+  from <- as.integer(readline(prompt="from : ")) # from which row
+  to <- as.integer(readline(prompt="to : ")) # to which row
+  Result <- Result[which(Result$Type %in% typeinfo[from:to,1]),] # filter by type
+  
+  # Collect data for locations
+  if(location.info)
+    Result <- cbind(Result,LocationData(Result)) # column-bind them together
+  
+  # Export to csv file
+  if(file.write){
+    write.csv(Result,file.name,row.names = FALSE)
+    cat("File",file.name,"is saved to",getwd(),"\n")
   }
   
+  return(Result)
+}
   
+### FOLLOWING FUNCTION(S) SHOULD BE TESTED! ###  
   # input ultimate filtered and location data included shipping data, for ONE quarter, and input number of the month and 
   # raw sale data, this function will match shipping data with sale data, and create a one merged data.
   Match.ShipData <- function(shipfiltered, # ultimate filtered and location data included shipping data 20 columns

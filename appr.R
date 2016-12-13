@@ -1113,6 +1113,55 @@ MultiPlotly <- function(x,                    # data of x axis
   return (TRUE)
 }
 
+# tests almost completed. this function multi-graphs a given data frame, according to determined facet. 
+# this function classifies and separates data frames using ggplot2's facet_grid() function
+Multi_Facet <- function(x,
+                        y,
+                        facet,
+                        main = "Facets",      # main title
+                        filename = "Multi_Facet",        # prefix for filename, without file extension
+                        directory = NULL,
+                        geom = "point",
+                        scales = "free_x",
+                        alpha = 1,
+                        libdir = "lib"
+){
+  library(ggplot2)
+  library(htmltools)
+  
+  main_path <- getwd() # main path before change
+  if(is.null(directory))
+    current_path <- paste(getwd(),paste("DataMatch",sample(1000,1),sep="_"),sep = "/") # folder names
+  else if(!is.null(directory))
+    current_path <- paste(getwd(),directory,sep = "/") # folder names
+  
+  dir.create(current_path) # create a new directory to store files
+  setwd(current_path) # set new working directory
+  cat("Working directory is set to",current_path,"\n")
+  
+  for(j in 1:ncol(x)){
+    current <- NA
+    for(i in 1:ncol(y)){
+      if (identical(x[,j],y[,i])) next()
+      init <- ggplot(my_samp, aes(x=x[,j], y=y[,i])) + 
+        switch (geom,
+                "jitter" = {geom_jitter(alpha = alpha)},
+                "point" = {geom_point(alpha = alpha)},
+                "line" = {geom_line(alpha = alpha)}
+        ) +
+        labs(title = main,x = colnames(x)[j],y = colnames(y)[i]) +
+        facet_grid(facet,scales = "free_x") # this is a useful binning for months
+      current <- tagList(current,plotly::ggplotly(init))
+    }
+    savename <- paste(filename,"_all_vs_",colnames(x)[j],".html",sep = "")
+    save_html(current,savename)#,libdir = libdir)
+    cat("File",savename,"saved to",getwd(),"\n")
+  }
+  setwd(main_path) # reset working directory
+  cat("Working directory is set to default,",main_path,"\n")
+  return(TRUE)
+}
+
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###
 ### ----------------------------------------------------------------------- ###

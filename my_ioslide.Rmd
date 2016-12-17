@@ -1,0 +1,40 @@
+---
+title: "Advanced Physics Project Presentation"
+author: "Mert Candar"
+output: 
+  ioslides_presentation:
+    widescreen: true
+    top: 50%
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Advanced Physics Project Progress Report {.flexbox .vcenter}
+
+<div class="centered">
+17.01.2016
+</div>
+
+## Content
+
+- Automated Facet Plots
+- ioslides with Rmarkdown
+- Tendency graphs with h2o (incomplete)
+
+## Automated Facet Plots
+
+```{r my_samp}
+library(ggplot2)
+sp <- ggplot(my_samp, aes(x=seq(nrow(my_samp)),y=Distance)) + #,colour = seq(nrow(my_samp))) + 
+  geom_point() +
+  facet_grid(. ~ Month,scales = "free_x")
+sp
+```
+## Slide with Plot
+
+```{r pressure}
+plot(pressure)
+```
+

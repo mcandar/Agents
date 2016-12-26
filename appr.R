@@ -3,7 +3,7 @@
 ### - Author     : Mert Candar ------------------------------------------------------ ###
 ### - Study      : Predictive Modelling with Machine Learning ----------------------- ###
 ### - Class      : Advanced Physics Project Lab ------------------------------------- ###
-### - Supervisor : Altan Cakir ------------------------------------------------------ ###
+### - Supervisor : Dr.Altan Cakir --------------------------------------------------- ###
 ### - Department of Physics Engineering, Istanbul Technical University -------------- ###
 ### - Istanbul, Turkey -------------------------------------------------------------- ###
 ### --------------------------------------------------------------------------------- ###
@@ -1161,6 +1161,60 @@ Multi_Facet <- function(x,
   cat("Working directory is set to default,",main_path,"\n")
   return(TRUE)
 }
+
+### ---- FOLLOWING PERCEPTRON ALGORITHMS TAKEN FROM AN EXTERNAL SOURCE ---- ###
+distance.from.plane = function(z,w,b) {
+  sum(z*w) + b
+}
+
+classify.linear = function(x,w,b) {
+  distances = apply(x, 1, distance.from.plane, w, b)
+  # print("distances is : ")
+  # print(distances)
+  return(ifelse(distances < 0, -1, +1))
+}
+
+euclidean.norm <- function(x){
+  return(sqrt(sum(x * x)))
+}
+
+
+perceptron <- function(x,               # data to be classified
+                       y,               # training output
+                       learning.rate=1, # learning rate (for convergence?)
+                       maxepoch=1e3){   # maximum number of iterations
+  pb <- txtProgressBar(style = 3)
+  x <- data.frame(x)
+  w <- vector(length = ncol(x)) # initialize w
+  b <- 0 # Initialize b
+  k <- 0 # count updates
+  R <- max(apply(x, 1, euclidean.norm))
+  made.mistake <- TRUE # to enter the while loop
+  j <- 0
+  while (made.mistake & j < maxepoch){
+    made.mistake<-FALSE # hopefully
+    yc <- classify.linear(x,w,b)
+    cond <- y != yc
+    for (i in 1:nrow(x)){
+      if (!is.na(cond[i])){
+        if(cond[i]){
+          w <- w + learning.rate * y[i]*x[i,]
+          b <- b + learning.rate * y[i]*R^2
+          k <- k+1
+          made.mistake<-TRUE
+        }
+      }
+      else # skip if NA value encountered
+        next()
+    }
+    j = j + 1
+    setTxtProgressBar(pb, j/maxepoch)
+  }
+  s <- euclidean.norm(w)
+  close(pb)
+  return(list(w=w/s,b=b/s,updates=k))
+}
+### ----------------------------------------------------------------------- ###
 
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###

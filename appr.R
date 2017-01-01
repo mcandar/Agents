@@ -800,14 +800,18 @@ Match.rows <- function(source,col.sou,target,col.tar){
 
 # this function is needed for filtering the shipping data. it gathers information about shipping types and one can decide
 # which type of shipping should be excluded.
-levels.ship <- function(data,col.type=6,col.cost=7,col.duration=11,distances=FALSE){
+levels.ship <- function(data,            # can be raw shipping data or matched version of it after cuts
+                        col.type=6,      # column number of types
+                        col.cost=7,      # column number of shipping costs
+                        col.duration=11, # column number of durations
+                        distances=FALSE){
   Result <- as.data.frame(levels(factor(data[,col.type])))
   Result$AveCost <- sapply(Result[,1],function(x) mean(na.omit(data[which(data[,col.type]==x),col.cost])))
   Result$TotalCost <- sapply(Result[,1],function(x) sum(na.omit(data[which(data[,col.type]==x),col.cost])))
   Result$AveDuration <- sapply(Result[,1],function(x) mean(na.omit(data[which(data[,col.type]==x),col.duration])))
   Result$Uses <- sapply(Result[,1],function(x) length(which(data$Type==x)))
   if(distances){
-    Result$Distance <- sapply(Result[,1],function(x) mean(na.omit(data[which(data[,col.type] == x),20])))
+    Result$Distance <- sapply(Result[,1],function(x) mean(na.omit(data[which(data[,col.type] == x),20]))) # col.dist taken as 20?
     Result$Index <- Result$Distance/(Result$AveCost*Result$AveDuration)
     colnames(Result) <- c("Type","AveCost","TotalCost","AveDuration","Uses","Distance","Index")
   }
@@ -1215,6 +1219,70 @@ perceptron <- function(x,               # data to be classified
   return(list(w=w/s,b=b/s,updates=k))
 }
 ### ----------------------------------------------------------------------- ###
+
+# For making deep classifications, i.e. using deep learning methods, following function creates a plot with
+# given data and classifies it. use library(h2o) and h2o.init(nthreads = -1, min_mem_size = "8G") commands before use.
+# input dataset should be three column, first two are numeric and last one is factor. column names are x,y 
+# and color respectively. apparently the last column contains colors.
+# example uses
+# classify.dl("Deep Learning",h2o.deeplearning(1:2,3,x,epochs=10),x,"Deep_Classification_ep10.pdf")
+
+classify.dl <- function(name,
+                        model,
+                        data,
+                        filename = NULL,
+                        div = 1e3){ # grid is made automatically
+  # form a grid
+  lims <- data.frame(xlim=c(max(data[,1]),min(data[,1])),ylim=c(max(data[,2]),min(data[,2])))
+  grid_testx <- seq(lims$xlim[1],lims$xlim[2],length.out = div)
+  grid_testy <- seq(lims$ylim[1],lims$ylim[2],length.out = div)
+  
+  grid_test <- data.frame()
+  for(i in 1:div)
+    grid_test <- rbind(grid_test,cbind(matrix(grid_testx,1000,1),rep(grid_testy[i],1000)))
+  
+  colnames(grid_test) <- c("x","y")
+  
+  # data <- as.h2o(data) # colnames(x) <- c("Distance","ShippingCost","color") originally
+  grid_test <- as.h2o(grid_test[(div*div):1,]) # reverse the order
+  
+  data <- as.data.frame(data) # get data from into R
+  pred <- as.data.frame(h2o.predict(model, grid_test))
+  n=0.5*(sqrt(nrow(grid_test))-1)
+  
+  if(!is.null(filename))
+    pdf(filename)
+  
+  plot(data[,-3],pch=19,col=data[,3],cex=0.5,xlim=c(lims$xlim[2],lims$xlim[1]),ylim=c(lims$ylim[2],lims$ylim[1]),main=name)
+  contour(grid_testx[div:1],grid_testy[div:1],z=array(ifelse(pred[,1]=="Red",0,1),dim=c(2*n+1,2*n+1)),col="blue",lwd=2,add=T)
+  
+  if(!is.null(filename))
+    dev.off()
+}
+
+# rearranged version od levels.ship, should be tested deeply
+levels.ship.ed <- function(data,            # can be raw shipping data or matched version of it after cuts
+                           col.type=6,      # column number of types
+                           col.cost=7,      # column number of shipping costs
+                           col.duration=11, # column number of durations
+                           distances=FALSE,
+                           loads=FALSE){
+  Result <- data.frame(Type=as.character(levels(factor(data[,col.type]))))
+  Result$AveCost <- sapply(Result[,1],function(x) mean(na.omit(data[which(data[,col.type]==x),col.cost])))
+  Result$TotalCost <- sapply(Result[,1],function(x) sum(na.omit(data[which(data[,col.type]==x),col.cost])))
+  Result$AveDuration <- sapply(Result[,1],function(x) mean(na.omit(data[which(data[,col.type]==x),col.duration])))
+  Result$Uses <- sapply(Result[,1],function(x) length(which(data$Type==x)))
+  
+  if(distances){
+    Result$Distance <- sapply(Result[,1],function(x) mean(na.omit(data[which(data[,col.type] == x),20]))) # col.dist taken as 20?
+    Result$Index <- Result$Distance/(Result$AveCost*Result$AveDuration)
+  }
+  if(loads){
+    Result$TotalLoad <- sapply(Result[,1],function(x)sum(na.omit(data[which(data[,col.type]==x),26]))) # column number is taken as 26
+    Result$AveLoad <- sapply(Result[,1],function(x) mean(na.omit(data[which(data[,col.type]==x),26])))
+  }
+  return(Sort(Result,2,decreasing = TRUE))
+}
 
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###

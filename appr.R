@@ -1641,6 +1641,50 @@ sales.daily <- function(raw_sale,category){
   return(data.frame(Days=seq.int(daynum),Result))
 }
 
+# PARALLEL VERSION
+# word-by-word string searching for each element in a vector or a list by splitting, returns indexes
+par.which.containingString <- function(x,ask,sep = " ",cl = NULL,nthreads = NULL){ # make the cluster as export
+  require(parallel)
+  force(x);force(ask);force(sep);
+  if(is.null(cl)){
+    if(is.null(nthreads)) nthreads = detectCores()
+    cl <- makeCluster(nthreads)
+    clusterExport(cl,c("x","ask","sep"),envir = environment())
+    stopcl <- TRUE
+  }
+  Result <- na.omit(parSapply(cl,seq.int(x), function(i)
+    ifelse(any(as.character(unlist(strsplit(x[i],split = sep))) %in% ask),i,NA)))
+  print(stopcl)
+  if(stopcl)
+    stopCluster(cl)
+  return(Result)
+}
+
+# THIS IS NOT FOR MULTIPLE CATEGORIES, WORKS FOR JUST ONE CATEGORY, ONE MONTH!
+# input a list, function will search its elements in raw_sale in the column index col.target
+sales.daily.perElement <- function(raw_sale, # sale data (raw or arranged) for preferably one category
+                                   source, # the quantity which will be searched for
+                                   col.target){ # target column of the sale data which will be searched in
+  require(lubridate)
+  daynum <- days_in_month(raw_sale$ShippingDate[sample.int(nrow(raw_sale),1)])
+  Result <- sapply(source,function(x){ 
+    temp <- raw_sale[which(raw_sale[,col.target]==x),c(2,7)] # only shipping date and unitsshipped
+    sapply(seq.int(daynum),function(y) 
+      sum(na.omit(temp$UnitsShipped[which(day(temp$ShippingDate)==y)])))
+  })
+  return(data.frame(Days=seq.int(daynum),Result))
+}
+
+Import.SaleData <- function(filename){
+  temp <- read.table(filename,sep = ",",colClasses = "character")
+  return(Format.SaleData(temp))
+}
+
+Import.ShipData <- function(filename){
+  temp <- read.table(filename,sep = ",",colClasses = "character")
+  return(Format.ShippingData(temp))
+}                   
+                   
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###
 ### ----------------------------------------------------------------------- ###

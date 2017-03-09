@@ -1675,11 +1675,39 @@ sales.daily.perElement <- function(raw_sale, # sale data (raw or arranged) for p
   return(data.frame(Days=seq.int(daynum),Result))
 }
 
+# PARALLEL VERSION
+# THIS IS NOT FOR MULTIPLE CATEGORIES, WORKS FOR JUST ONE CATEGORY, ONE MONTH!
+# input a list, function will search its elements in raw_sale in the column index col.target
+# and return the number of sales per given element, daily
+# for example: input the some zip numbers, it will list how many products are sold in one month to those zips
+par.sales.daily.perElement <- function(raw_sale,source,col.target,cl = NULL,nthreads = NULL){
+  require(lubridate)
+  require(parallel)
+  daynum <- days_in_month(raw_sale$ShippingDate[sample.int(nrow(raw_sale),1)])
+  force(c(raw_sale,source,col.target))#;force(ask);force(sep);
+  if(is.null(cl)){ # if no cluster specified, initiate a new one
+    if(is.null(nthreads)) nthreads = detectCores() # if number of cores is not specified, use all of them
+    cl <- makeCluster(nthreads)
+    clusterExport(cl,c("raw_sale","source","col.target","day"),envir = environment()) # introduce variables to cluster, from current environment
+    stopcl <- TRUE
+  }
+  Result <- parSapply(cl,source,function(x){ 
+    temp <- raw_sale[which(raw_sale[,col.target]==x),c(2,7)] # only shipping date and unitsshipped
+    sapply(seq.int(daynum),function(y) 
+      sum(na.omit(temp$UnitsShipped[which(day(temp$ShippingDate)==y)])))
+  })
+  if(stopcl)
+    stopCluster(cl)
+  return(data.frame(Days=seq.int(daynum),Result))
+}                   
+
+# easy-import raw sale data
 Import.SaleData <- function(filename){
   temp <- read.table(filename,sep = ",",colClasses = "character")
   return(Format.SaleData(temp))
 }
 
+# easy-import raw shipping data
 Import.ShipData <- function(filename){
   temp <- read.table(filename,sep = ",",colClasses = "character")
   return(Format.ShippingData(temp))

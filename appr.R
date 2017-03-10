@@ -1312,6 +1312,7 @@ par.zip.coordinates <- function(x,nthreads = NULL){
   require(parallel)
   if(is.null(nthreads)) nthreads <- detectCores() # if not specified, use all available cores
   if(!exists("Zips")) Zips <- GetZips() # if zip database does not exists, import it.
+  force(c(x,nthreads,Zips))
   cl <-  makeCluster(nthreads) # initiate a cluster
   clusterExport(cl,c("Zips","x")) # export variables
   Result <- as.data.frame(matrix(I(unlist(
@@ -1329,6 +1330,7 @@ par.zip.location <- function(x,nthreads = NULL){
   require(parallel)
   if(is.null(nthreads)) nthreads <- detectCores() # if not specified, use all available cores
   if(!exists("Zips")) Zips <- GetZips() # if zip database does not exists, import it.
+  force(c(x,nthreads,Zips))
   cl <-  makeCluster(nthreads) # initiate a cluster
   clusterExport(cl,c("Zips","x")) # export variables
   Result <- as.data.frame(matrix(unlist(
@@ -1352,7 +1354,7 @@ par.LocationData <- function(data,       # can be raw shipdata or saledata, or a
   if(!exists("Zips")) Zips <- GetZips() # if zip database does not exists, import it.
   Result <- as.data.frame(matrix(NA,nrow(data),9)) # preallocate output matrix
   colnames(Result) <- c("S.Lat","S.Lon","R.Lat","R.Lon","S.City","S.StateCode","R.City","R.StateCode","Distance")
-  
+  force(c(data,col.sen,col.rec,nthreads,Zips))
   # get coordinates as lat and lon from zips
   Result[,c(1,2)] <- par.zip.coordinates(data[,col.sen],nthreads) # find coordinates of sender zips
   Result[,c(3,4)] <- par.zip.coordinates(data[,col.rec],nthreads) # find coordinates of receipent zips

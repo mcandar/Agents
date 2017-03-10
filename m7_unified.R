@@ -67,7 +67,7 @@ Match.ShipData <- function(shipfiltered, # ultimate filtered and location data i
   
   # at following line temp_ship[,ship.sonumber] is changed to as.integer(levels(factor(temp_ship[,ship.sonumber])))
   temp_raw <- Search.List(as.integer(levels(factor(temp_ship[,ship.sonumber]))),saledata,sale.sonumber)[,-1] # get corresponding rows of saledata, by sonumber
-  print(temp_raw)
+  # print(temp_raw)
   cat("Temporary fractional sale data is formed with corresponding SONumbers.\n")
   
   rows <- nrow(temp_ship) # get number of rows to use in following for loop
@@ -75,13 +75,21 @@ Match.ShipData <- function(shipfiltered, # ultimate filtered and location data i
   
   ## divide into fractions and then unify into one big file
   for(i in begin:iterations){
+    pb <- txtProgressBar(style = 3) # create a progress bar object
     cat("Step",i,"\n")
     index <- seq((i-1)*(rows/iterations)+1,i*(rows/iterations)) # determine interval of indexes
+    #### added later
+    # row number of temp_ship?, divide it into groups as iterations and parallelize the process
+    temp_ship <- Sort(subset(shipfiltered,month(shipfiltered$DateShipped)==as.integer(month))[index,],7,decreasing = TRUE)
+    temp_raw <- Search.List(as.integer(levels(factor(temp_ship[,ship.sonumber]))),saledata,sale.sonumber)[,-1] # get corresponding rows of saledata, by sonumber
+    #### until here
     test_match <- Match.rows(temp_ship[index,],ship.sonumber,temp_raw,sale.sonumber) # match data and bind together as a data frame
+    
     check_sen <- test_match[,4]==test_match[,23] & test_match[,5]==test_match[,24] # check receipent and sender zips whether they match
     test_match <- test_match[check_sen,] # take only who match by zips
     write.csv(test_match,paste(filename,i,".csv",sep = ""),row.names = FALSE) # write to file with order
     cat("File",paste(filename,i,".csv",sep = ""),"is saved to",getwd(),"\n") # inform user
+    setTxtProgressBar(pb, i/iterations) # update progress bar
   }
   
   Result <- data.frame()

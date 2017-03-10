@@ -1,0 +1,95 @@
+---
+title: "Advanced Physics Project Progress Report"
+author: "Mert Candar"
+date: "22 Dec 2016"
+output:
+  beamer_presentation: default
+  ioslides_presentation:
+    widescreen: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Classification - Plots 1
+
+<div class=centered>
+![At First Glance](canvas.png)
+</div>
+
+## Classification - Plots 2
+
+<div class=centered>
+![Classification Plot with Facetting](Rplot02.png)
+</div>
+
+
+## Classification - Introduction to Learning
+
+- Perceptron Linear Classification
+- Deep Classification
+- Other Methods
+
+## Classification - Introduction to Learning 2
+
+<div class=centered>
+![Test data](perceptron_cl.png)
+</div>
+
+
+## Classification - Learning Algorithms
+
+<div class=centered>
+![Test data](spiraltest.png)
+</div>
+
+## Classification - Learning Algorithms Code 1
+
+spiral <- h2o.importFile("https://raw.githubusercontent.com/h2oai/h2o-tutorials/master/tutorials/data/spiral.csv")
+grid   <- h2o.importFile("https://raw.githubusercontent.com/h2oai/h2o-tutorials/master/tutorials/data/grid.csv")
+# Define helper to plot contours
+
+plotC <- function(name,        # title of the graph
+                  model,       # model to be used, e.g. h2o.deeplearning(...), (e.g. some trained network or else)
+                  data=spiral, # default dataset is spiral
+                  g=grid) {
+  data <- as.data.frame(data) # get data from into R
+  pred <- as.data.frame(h2o.predict(model, g))
+  n=0.5*(sqrt(nrow(g))-1)
+  d <- 1.5 # axis limits
+  h <- d*(-n:n)/n
+  plot(data[,-3],pch=19,col=data[,3],cex=0.5,xlim=c(-d,d),ylim=c(-d,d),main=name)
+  contour(h,h,z=array(ifelse(pred[,1]=="Red",0,1),dim=c(2*n+1,2*n+1)),col="blue",lwd=2,add=T)
+}
+
+
+## Classification - Learning Algorithms Code 2
+
+pdf("test_grid_classification.pdf")
+par(mfrow=c(2,2)) #set up the canvas for 2x2 plots
+plotC("DL", h2o.deeplearning(1:2,3,spiral,epochs=1e3))
+
+plotC("GBM", h2o.gbm         (1:2,3,spiral))
+
+plotC("DRF", h2o.randomForest(1:2,3,spiral))
+
+plotC("GLM", h2o.glm         (1:2,3,spiral,family="binomial"))
+
+dev.off()
+
+## Classification - Learning Algorithms Comparison
+
+![](deep_class_epoch1e2.png)
+
+## Classification - Learning Algorithms Comparison 2
+
+<!-- <img src="classification_dl_methods.png" alt="Drawing" style="height: 450px -->
+![](classification_dl_methods.png)
+
+## Thanks for listening
+
+
+
+
+

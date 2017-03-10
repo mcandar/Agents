@@ -30,7 +30,7 @@ Match.rows <- function(source,col.sou,target,col.tar){
         Result <- rbind(Result,cbind(source[i,],target[index[[j]],])) # write corresponding matches
         cat(j,"th cycle of multiple matchings in",source[i,col.sou],"index :",i,"\n")
       }
-      target <- target[-index,] # exclude elements that has been listed, (on test)
+      # target <- target[-index,] # exclude elements that has been listed, (on test)
     }
     else if(len==0){ # if could not be found
       temp <- matrix(NA,1,ncol(target))
@@ -66,6 +66,7 @@ Match.ShipData <- function(shipfiltered, # ultimate filtered and location data i
   cat("Filtered shipping data is fractionated according to month.\n")
   
   # at following line temp_ship[,ship.sonumber] is changed to as.integer(levels(factor(temp_ship[,ship.sonumber])))
+  # use levels() to prevent overlapping (searching an object twice or more)
   temp_raw <- Search.List(as.integer(levels(factor(temp_ship[,ship.sonumber]))),saledata,sale.sonumber)[,-1] # get corresponding rows of saledata, by sonumber
   print(temp_raw)
   cat("Temporary fractional sale data is formed with corresponding SONumbers.\n")
@@ -78,6 +79,7 @@ Match.ShipData <- function(shipfiltered, # ultimate filtered and location data i
     cat("Step",i,"\n")
     index <- seq((i-1)*(rows/iterations)+1,i*(rows/iterations)) # determine interval of indexes
     test_match <- Match.rows(temp_ship[index,],ship.sonumber,temp_raw,sale.sonumber) # match data and bind together as a data frame
+    print("I successfully applied match rows function.")
     check_sen <- test_match[,4]==test_match[,23] & test_match[,5]==test_match[,24] # check receipent and sender zips whether they match
     test_match <- test_match[check_sen,] # take only who match by zips
     write.csv(test_match,paste(filename,i,".csv",sep = ""),row.names = FALSE) # write to file with order

@@ -1643,19 +1643,29 @@ sales.daily <- function(raw_sale,category){
 
 # PARALLEL VERSION
 # word-by-word string searching for each element in a vector or a list by splitting, returns indexes
-par.which.containingString <- function(x,ask,sep = " ",cl = NULL,nthreads = NULL){ # make the cluster as export
-  require(parallel)
+par.which.containingString <- function(x, # the vector to be searched if it contain variable "ask"
+                                       ask, # the variable or list to search in target "x"
+                                       sep = " ", # separator to split
+                                       index = NULL, # index number to look in each row
+                                       cl = NULL, # cluster to specify if one does not need this function to initiate it itself
+                                       nthreads = NULL){ # make the cluster as export
+  require(parallel) # export the library
   force(x);force(ask);force(sep);
-  if(is.null(cl)){
-    if(is.null(nthreads)) nthreads = detectCores()
+  if(is.null(cl)){ # if no cluster specified, make a new one
+    if(is.null(nthreads)) nthreads = detectCores() # if number of cores is not specified, use all of them
     cl <- makeCluster(nthreads)
-    clusterExport(cl,c("x","ask","sep"),envir = environment())
+    clusterExport(cl,c("x","ask","sep"),envir = environment()) # introduce variables to cluster
     stopcl <- TRUE
   }
-  Result <- na.omit(parSapply(cl,seq.int(x), function(i)
-    ifelse(any(as.character(unlist(strsplit(x[i],split = sep))) %in% ask),i,NA)))
-  print(stopcl)
-  if(stopcl)
+  
+  if(is.null(index)) # if index is not specified, look for all elements after split
+    Result <- na.omit(parSapply(cl,seq.int(x), function(i) # list the indexes which is containing given string
+      ifelse(any(as.character(unlist(strsplit(x[i],split = sep))) %in% ask),i,NA)))
+  else # just look for the element specified by "index" if it matches with ask value
+    Result <- na.omit(parSapply(cl,seq.int(x), function(i) # list the indexes which is containing given string
+      ifelse(any(as.character(unlist(strsplit(x[i],split = sep))[index]) %in% ask),i,NA)))
+  
+  if(stopcl) # stop the self-initiated cluster
     stopCluster(cl)
   return(Result)
 }

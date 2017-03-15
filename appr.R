@@ -1699,26 +1699,29 @@ par.sales.daily.perElement <- function(raw_sale,       # target data frame
 ){
   require(lubridate)
   require(parallel)
-  mnths <- as.integer(levels(factor(month(raw_sale$ShippingDate))))
+  
+  dates <- as.Date(raw_sale$ShippingDate) # entire date column
+  mnths <- as.integer(levels(factor(month(dates)))) # just how many different months there are
   
   force(c(raw_sale,source,col.target)) # force variables to enter into environment
   if(is.null(cl)){ # if no cluster specified, make a new one
     if(is.null(nthreads)) nthreads = detectCores() # if number of cores is not specified, use all of them
     cl <- makeCluster(nthreads)
-    clusterExport(cl,c("raw_sale","source","col.target","day"),envir = environment()) # introduce variables to cluster, from current environment
+    clusterExport(cl,c("raw_sale","source","col.target","day","dates"),envir = environment()) # introduce variables to cluster, from current environment
     stopcl <- TRUE
   }
   else
     stopcl <- FALSE
-  
+  print("I go into for loop")
   output <- data.frame() # final output
   for(i in mnths){ # for all months included in the raw_sale dataframe
-    raw_temp <- raw_sale[which(month(raw_sale$ShippingDate)==i),] # take data only for current month
-    daynum <- days_in_month(raw_temp$ShippingDate[sample.int(nrow(raw_temp),1)]) # get the current month's total day number
+    raw_temp <- raw_sale[which(month(dates)==i),] # take data only for current month
+    daynum <- days_in_month(dates[sample.int(nrow(raw_temp),1)]) # get the current month's total day number
+    print("I came to parsapply")
     Result <- parSapply(cl,source,function(x){ 
       temp <- raw_temp[which(raw_temp[,col.target]==x),c(2,7)] # only shipping date and unitsshipped
       sapply(seq.int(daynum),function(y) 
-        sum(na.omit(temp$UnitsShipped[which(day(temp$ShippingDate)==y)])))
+        sum(na.omit(temp$UnitsShipped[which(day(as.character(temp$ShippingDate))==y)])))
     })
     output <- rbind(output,data.frame(Days=seq.int(daynum),Result))
   }
@@ -1757,7 +1760,7 @@ cclist <- function(xdata,                # first data frame, considered as x
       # calculate cross-correlation and take only numerical values
       temp <- ccf(xdata[,x],ydata[,y],type = type,lag.max = lag.max,plot = FALSE)$acf
       # combine with other values such as max, lag at which the cor is max, rott-mean-square, and CC values
-      c(cat1,cat2,colnames(xdata)[x],colnames(ydata)[y],max(temp),(which.max(temp)-(lag+1)),rms(temp),temp)
+      c(cat1,cat2,colnames(xdata)[x],colnames(ydata)[y],max(temp),(which.max(temp)-(lag.max+1)),rms(temp),temp)
     })))
   })
   
@@ -1767,6 +1770,10 @@ cclist <- function(xdata,                # first data frame, considered as x
   Result[,5:(8+lag.max*2)] <- sapply(Result[,5:(8+lag.max*2)],as.numeric) # set the column types
   return(Result)
 }
+                        
+# calculate root-mean-square
+rms <- function(x)
+  sqrt(mean(x^2))
 
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###

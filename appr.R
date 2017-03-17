@@ -1673,18 +1673,39 @@ par.which.containingString <- function(x, # the vector to be searched if it cont
 # input a list, function will search its elements in raw_sale in the column index col.target
 # and return the number of sales per given element, daily
 # for example: input the some zip numbers, it will list how many products are sold in one month to those zips
+# sales.daily.perElement <- function(raw_sale, # sale data (raw or arranged) for preferably one category
+#                                    source, # the quantity which will be searched for
+#                                    col.target){ # target column of the sale data which will be searched in
+#   require(lubridate)
+#   daynum <- days_in_month(raw_sale$ShippingDate[sample.int(nrow(raw_sale),1)])
+#   Result <- sapply(source,function(x){ 
+#     temp <- raw_sale[which(raw_sale[,col.target]==x),c(2,7)] # only shipping date and unitsshipped
+#     sapply(seq.int(daynum),function(y) 
+#       sum(na.omit(temp$UnitsShipped[which(day(temp$ShippingDate)==y)])))
+#   })
+#   return(data.frame(Days=seq.int(daynum),Result))
+# }
+
 sales.daily.perElement <- function(raw_sale, # sale data (raw or arranged) for preferably one category
                                    source, # the quantity which will be searched for
                                    col.target){ # target column of the sale data which will be searched in
   require(lubridate)
-  daynum <- days_in_month(raw_sale$ShippingDate[sample.int(nrow(raw_sale),1)])
-  Result <- sapply(source,function(x){ 
-    temp <- raw_sale[which(raw_sale[,col.target]==x),c(2,7)] # only shipping date and unitsshipped
-    sapply(seq.int(daynum),function(y) 
-      sum(na.omit(temp$UnitsShipped[which(day(temp$ShippingDate)==y)])))
-  })
-  return(data.frame(Days=seq.int(daynum),Result))
-}
+  dates <- as.Date(raw_sale$ShippingDate) # entire date column
+  mnths <- as.integer(levels(factor(month(dates))))
+
+  output <- data.frame() # final output
+  for(i in mnths){ # for all months included in the raw_sale dataframe
+    raw_temp <- raw_sale[which(month(dates)==i),] # take data only for current month
+    daynum <- days_in_month(dates[sample.int(nrow(raw_temp),1)]) # get the current month's total day number
+    Result <- sapply(source,function(x){ 
+      temp <- raw_temp[which(raw_temp[,col.target]==x),c(2,7)] # only shipping date and unitsshipped
+      sapply(seq.int(daynum),function(y) 
+        sum(na.omit(temp$UnitsShipped[which(day(as.character(temp$ShippingDate))==y)])))
+    })
+    output <- rbind(output,data.frame(Days=seq.int(daynum),Result))
+  }
+  return(output)
+}                   
 
 # PARALLEL VERSION
 # THIS IS NOT FOR MULTIPLE CATEGORIES, WORKS FOR JUST ONE CATEGORY, ONE MONTH!

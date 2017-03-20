@@ -1781,8 +1781,8 @@ cclist <- function(xdata,                # first data frame, considered as x
                    type = "correlation", # type, (cross) "correlation" or "covariance"
                    lag.max = 20          # maximum lag value to calculate cross-correlation
 ){
-  xdata <- sapply(xdata,as.numeric)
-  ydata <- sapply(ydata,as.numeric)
+  # xdata <- sapply(xdata,as.numeric)
+  # ydata <- sapply(ydata,as.numeric)
   
   deinit_x <- which(sapply(xdata,function(x) var(x)==0)) # get the columns with zero variance, for xdata
   deinit_y <- which(sapply(ydata,function(x) var(x)==0)) # get the columns with zero variance, for ydata
@@ -1796,6 +1796,9 @@ cclist <- function(xdata,                # first data frame, considered as x
       if(any(deinit_x == x) || any(deinit_y == y)){
         temp <- as.numeric(rep(0,2*lag.max+1))
         print("Zero variance encountered.")
+        # n <- readline(prompt="Enter an integer: ")
+        # if(n == "n")
+          # break
       }
       else
         temp <- as.numeric(ccf(xdata[,x],ydata[,y],type = type,lag.max = lag.max,plot = F)$acf)

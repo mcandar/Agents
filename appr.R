@@ -1781,22 +1781,43 @@ cclist <- function(xdata,                # first data frame, considered as x
                    type = "correlation", # type, (cross) "correlation" or "covariance"
                    lag.max = 20          # maximum lag value to calculate cross-correlation
 ){
+  xdata <- sapply(xdata,as.numeric)
+  ydata <- sapply(ydata,as.numeric)
+  
+  deinit_x <- which(sapply(xdata,function(x) var(x)==0)) # get the columns with zero variance, for xdata
+  deinit_y <- which(sapply(ydata,function(x) var(x)==0)) # get the columns with zero variance, for ydata
+  
   Result <- lapply(seq.int(ncol(xdata)),function(x){ # outer loop, for x
     # note that transpose is taken for a better data shape and as.data.frame for use of function "bind_rows"
     as.data.frame(t(sapply(seq.int(ncol(ydata)),function(y){ # inner loop, for y
       # calculate cross-correlation and take only numerical values
-      temp <- ccf(xdata[,x],ydata[,y],type = type,lag.max = lag.max,plot = FALSE)$acf
+      print("I came into core of cclist") # to delete later
+      cat("x =",x,"y =",y,"\n")
+      if(any(deinit_x == x) || any(deinit_y == y)){
+        temp <- as.numeric(rep(0,2*lag.max+1))
+        print("Zero variance encountered.")
+      }
+      else
+        temp <- as.numeric(ccf(xdata[,x],ydata[,y],type = type,lag.max = lag.max,plot = F)$acf)
+      
+      print("I pass ccf")
       # combine with other values such as max, lag at which the cor is max, rott-mean-square, and CC values
       c(cat1,cat2,colnames(xdata)[x],colnames(ydata)[y],max(temp),(which.max(temp)-(lag.max+1)),rms(temp),temp)
     })))
   })
   
+  # print(lapply(Result,class))
+  
   Result <- dplyr::bind_rows(Result) # give the final shape, from list to data frame
   colnames(Result) <- c("Category1","Category2","StateAbb1","StateAbb2","MaxCC","MaxCCatLag",
                         "RmsCC",as.character(-lag.max:lag.max)) # rearrange column names
+  print("In cclist: I'm gonna finally convert them to numeric before return.")
+  
+  # convert to numeric if type list with a function
   Result[,5:(8+lag.max*2)] <- sapply(Result[,5:(8+lag.max*2)],as.numeric) # set the column types
   return(Result)
 }
+
                         
 # calculate root-mean-square
 rms <- function(x)

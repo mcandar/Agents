@@ -1647,6 +1647,7 @@ par.which.containingString <- function(x, # the vector to be searched if it cont
                                        cl = NULL, # cluster to specify if one does not need this function to initiate it itself
                                        nthreads = NULL){ # make the cluster as export
   require(parallel) # export the library
+  x <- as.character(x)
   force(x);force(ask);force(sep);
   if(is.null(cl)){ # if no cluster specified, make a new one
     if(is.null(nthreads)) nthreads = detectCores() # if number of cores is not specified, use all of them

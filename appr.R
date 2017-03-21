@@ -1290,6 +1290,7 @@ levels.ship.ed <- function(data,            # can be raw shipping data or matche
 #     ifelse(any(as.character(unlist(strsplit(x[i],split = sep))) %in% ask),i,NA))))
 
 which.containingString <- function(x,ask,sep = " ",index = NULL){
+  x <- as.character(x)
   if(is.null(index))
     return(na.omit(sapply(seq.int(x), function(i)
       ifelse(any(as.character(unlist(strsplit(x[i],split = sep))) %in% ask),i,NA))))

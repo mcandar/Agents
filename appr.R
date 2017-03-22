@@ -1822,12 +1822,42 @@ cclist <- function(xdata,                # first data frame, considered as x
   Result[,5:(8+lag.max*2)] <- sapply(Result[,5:(8+lag.max*2)],as.numeric) # set the column types
   return(Result)
 }
-
-                        
+        
 # calculate root-mean-square
 rms <- function(x)
   sqrt(mean(x^2))
 
+# this function is designed to gather data according to output of cclist function
+# this data can be used in predictive modelling
+# output is daily sale figures for each row in output of cclist function
+cclist.source <- function(raw_cclist, # output of cclist function
+                          raw_big # a location data added sale data, should contain all categories for raw_cclist
+){
+  # list the most correlated ones and then form the data frame according to that order, right here
+  init_c <- as.character(levels(factor(raw_cclist$Category2)))
+  
+  Result <- data.frame()
+  c_names <- NULL
+  
+  for(i in 1:length(init_c)){
+    temp_states <- as.character(levels(factor(raw_cclist[which(raw_cclist$Category2==init_c[i]),4]))) # get state names
+    temp <- raw_big[which.containingString(raw_big$ItemDescription,init_c[i],index = 1),]
+    temp <- sales.daily.perElement(temp,temp_states,16)
+    c_names <- c(c_names,paste(init_c[i],temp_states,sep = "_"))
+    
+    if(i == 1)
+      Result <- temp
+    else
+      Result <- cbind(Result,temp[,-1])
+  }
+  
+  colnames(Result) <- c("Days",c_names)
+  Result <- sapply(Result,as.numeric)
+  
+  return(Result)
+}
+
+  
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###
 ### ----------------------------------------------------------------------- ###

@@ -1831,19 +1831,31 @@ rms <- function(x)
 # this data can be used in predictive modelling
 # output is daily sale figures for each row in output of cclist function
 cclist.source <- function(raw_cclist, # output of cclist function
-                          raw_big # a location data added sale data, should contain all categories for raw_cclist
-){
+                          raw_big, # a location data added sale data, should contain all categories for raw_cclist
+                          lag.col = 6,
+                          filename = NULL # prompt a string if you want to save to file, include file extension(.csv)
+                          ){
   # list the most correlated ones and then form the data frame according to that order, right here
   init_c <- as.character(levels(factor(raw_cclist$Category2)))
   
   Result <- data.frame()
   c_names <- NULL
-  
+  lags <- NULL
+  nms_final <- data.frame()
+  pb <- txtProgressBar(min = 1,max = length(init_c),style = 3)
   for(i in 1:length(init_c)){
+    setTxtProgressBar(pb,i)
     temp_states <- as.character(levels(factor(raw_cclist[which(raw_cclist$Category2==init_c[i]),4]))) # get state names
     temp <- raw_big[which.containingString(raw_big$ItemDescription,init_c[i],index = 1),]
     temp <- sales.daily.perElement(temp,temp_states,16)
     c_names <- c(c_names,paste(init_c[i],temp_states,sep = "_"))
+    
+    nms <- data.frame(Cat=init_c[i],State=temp_states)
+    nms_final <- rbind(nms_final,nms)
+    # print(nms)
+    lags <- c(lags,as.numeric(sapply(1:nrow(nms),function(x)
+      raw_cclist[which(as.character(raw_cclist$Category2) == nms[x,1] &
+                         as.character(raw_cclist$StateAbb2) == nms[x,2]),lag.col])))
     
     if(i == 1)
       Result <- temp
@@ -1854,7 +1866,19 @@ cclist.source <- function(raw_cclist, # output of cclist function
   colnames(Result) <- c("Days",c_names)
   Result <- sapply(Result,as.numeric)
   
-  return(Result)
+  print(ncol(Result)-1)
+  output <- data.frame(nms_final,Lag=lags)
+  # print(output)
+  
+  if(!is.null(filename)){
+    write.csv(Result,paste("SourceData",filename,sep = "_"),row.names = FALSE)
+    write.csv(output,paste("LagData",filename,sep = "_"),row.names = FALSE)
+    cat("Files",paste("SourceData",filename,sep = "_"),"and",paste("LagData",filename,sep = "_"),
+        "are saved to",getwd(),"\n")
+  }
+
+  close(pb)
+  return(list(Source=Result,Lag=output)) # check the indexes later, first leads by 1.
 }
 
   

@@ -1880,7 +1880,21 @@ cclist.source <- function(raw_cclist, # output of cclist function
   close(pb)
   return(list(Source=Result,Lag=output)) # check the indexes later, first leads by 1.
 }
-
+      
+# easy cut and filtering of cclist function output
+cclist.filter <- function(raw_cclist, # output of cclist function, containing cross correlation data
+                          lag.filter = 0, # MaxCCatLag filter, takes the values greater than what is prompted
+                          cor.filter = 0.6, # MaxCC filter, takes the values greater than what is prompted
+                          nosratio.filter = 100, # NoSRatio filter, takes the values less than what is prompted
+                          state.filter = state.abb){ # StateAbb1 filter, just takes the states prompted, default is all states
+  return(dplyr::filter(raw_cclist,
+                       MaxCCatLag > lag.filter,
+                       MaxCC != 1,
+                       MaxCC > cor.filter,
+                       StateAbb1 %in% state.filter,
+                       NoSRatio < nosratio.filter)) # a good piping and assigning operator
+}
+      
   
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###

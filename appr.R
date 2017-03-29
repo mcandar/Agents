@@ -1834,15 +1834,20 @@ cclist.source <- function(raw_cclist, # output of cclist function
                           raw_big, # a location data added sale data, should contain all categories for raw_cclist
                           lag.col = 6,
                           filename = NULL # prompt a string if you want to save to file, include file extension(.csv)
-                          ){
+){
   # list the most correlated ones and then form the data frame according to that order, right here
   init_c <- as.character(levels(factor(raw_cclist$Category2)))
+  pb <- txtProgressBar(min = 1,max = length(init_c),style = 3) # init a progress bar
   
-  Result <- data.frame()
-  c_names <- NULL
-  lags <- NULL
-  nms_final <- data.frame()
-  pb <- txtProgressBar(min = 1,max = length(init_c),style = 3)
+  # initiate first 2 columns, considering that category1 and stateabb1 columns have constant values respectively
+  # the first sale column will be predicted, output of the deep learning model
+  temp <- raw_big[which.containingString(raw_big$ItemDescription,raw_cclist$Category1[1],index = 1),] # get corresp. data
+  Result <- sales.daily.perElement(temp,as.character(raw_cclist$StateAbb1[1]),16) # get daily sale figures
+  c_names <- paste(raw_cclist$Category1[1],raw_cclist$StateAbb1[1],sep = "_") # get just names to set before return
+  colind <- 2 # start a counter for column indexes
+  nms_final <- data.frame(Cat=raw_cclist$Category1[1],State=raw_cclist$StateAbb1[1],ColumnIndex=colind) # init a df for lag data
+  lags <- 0 # start a counter for lag data, will store corresponding lag/lead values
+  
   for(i in 1:length(init_c)){
     setTxtProgressBar(pb,i)
     temp_states <- as.character(levels(factor(raw_cclist[which(raw_cclist$Category2==init_c[i]),4]))) # get state names
@@ -1850,33 +1855,31 @@ cclist.source <- function(raw_cclist, # output of cclist function
     temp <- sales.daily.perElement(temp,temp_states,16)
     c_names <- c(c_names,paste(init_c[i],temp_states,sep = "_"))
     
-    nms <- data.frame(Cat=init_c[i],State=temp_states)
-    nms_final <- rbind(nms_final,nms)
-    # print(nms)
+    currentseq <- seq_along(temp_states) # for multiple column indexes at a time
+    nms <- data.frame(Cat=init_c[i],State=temp_states,ColumnIndex=currentseq+colind) # col names in current step
+    nms_final <- rbind(nms_final,nms) # rbind to store in a df
+    colind <- length(currentseq)+colind # increase the column indexes counter
+
     lags <- c(lags,as.numeric(sapply(1:nrow(nms),function(x)
-      raw_cclist[which(as.character(raw_cclist$Category2) == nms[x,1] &
-                         as.character(raw_cclist$StateAbb2) == nms[x,2]),lag.col])))
+      as.data.frame(raw_cclist[which(as.character(raw_cclist$Category2) == nms[x,1] &
+                                       as.character(raw_cclist$StateAbb2) == nms[x,2]),lag.col]))))
     
-    if(i == 1)
-      Result <- temp
-    else
-      Result <- cbind(Result,temp[,-1])
+    Result <- cbind(Result,temp[,-1])
   }
   
   colnames(Result) <- c("Days",c_names)
-  Result <- sapply(Result,as.numeric)
+  Result <- sapply(Result,as.numeric) # convert all columns to numeric
   
-  print(ncol(Result)-1)
-  output <- data.frame(nms_final,Lag=lags)
-  # print(output)
+  output <- data.frame(nms_final,Lag=lags) # give final shape of lag data
   
+  # write to file if filename is prompted
   if(!is.null(filename)){
     write.csv(Result,paste("SourceData",filename,sep = "_"),row.names = FALSE)
     write.csv(output,paste("LagData",filename,sep = "_"),row.names = FALSE)
     cat("Files",paste("SourceData",filename,sep = "_"),"and",paste("LagData",filename,sep = "_"),
         "are saved to",getwd(),"\n")
   }
-
+  
   close(pb)
   return(list(Source=Result,Lag=output)) # check the indexes later, first leads by 1.
 }
@@ -1894,12 +1897,32 @@ cclist.filter <- function(raw_cclist, # output of cclist function, containing cr
                        StateAbb1 %in% state.filter,
                        NoSRatio < nosratio.filter)) # a good piping and assigning operator
 }
-      
+
+# easy-arrange and prepare to give final shape before deep learning
+# the output of this function could be directly used in predictive modelling
+# note that the second column (the one next to Days) is the target column which will be predicted
+cclist.arrange <- function(raw_cclist){
+  #initiate with target vector, this will be predicted
+  maxlag <- max(raw_cclist$Lag$Lag)
+  Result <- data.frame(Days=raw_cclist$Source$Days[(maxlag+1):nrow(raw_cclist$Source)],
+                       MNTR_MN=raw_cclist$Source$MNTR_MN[(maxlag+1):nrow(raw_cclist$Source)])
+  
+  for(i in seq((nrow(raw_cclist$Lag)-1))+2){
+    currentlag <- raw_cclist$Lag$Lag[i-1]
+    temp <- raw_cclist$Source[seq(nrow(raw_cclist$Source)-currentlag),i] # apply lags
+    Result <- cbind(Result,temp[(maxlag-currentlag+1):length(temp)]) # take just matching part, according to max lag
+  }
+  
+  colnames(Result) <- colnames(raw_cclist$Source) # set column names
+  return(Result)
+}
+                                     
   
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###
 ### ----------------------------------------------------------------------- ###
 
+# My first codes after I started to learn R                                     
 # Kindly note that following functions are not optimized, but left original as first written.
 TxtFindFirst <- function(filename,value,delimiter){ # return the indexes of the value found at first
   data <- read.table(filename,sep=delimiter) # read the text file

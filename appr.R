@@ -1901,11 +1901,11 @@ cclist.filter <- function(raw_cclist, # output of cclist function, containing cr
 # easy-arrange and prepare to give final shape before deep learning
 # the output of this function could be directly used in predictive modelling
 # note that the second column (the one next to Days) is the target column which will be predicted
-cclist.arrange <- function(raw_cclist){
+cclist.arrange <- function(raw_cclist,response.col=2){
   #initiate with target vector, this will be predicted
   maxlag <- max(raw_cclist$Lag$Lag)
   Result <- data.frame(Days=raw_cclist$Source$Days[(maxlag+1):nrow(raw_cclist$Source)],
-                       MNTR_MN=raw_cclist$Source$MNTR_MN[(maxlag+1):nrow(raw_cclist$Source)])
+                       Response=raw_cclist$Source[(maxlag+1):nrow(raw_cclist$Source),response.col])
   
   for(i in seq((nrow(raw_cclist$Lag)-1))+2){
     currentlag <- raw_cclist$Lag$Lag[i-1]

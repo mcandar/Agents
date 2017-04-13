@@ -11,6 +11,18 @@
 ## Copy-paste following line to import the content directly from github ##
 # source("https://raw.githubusercontent.com/mcandar/Agents/master/appr.R")
 
+# Required Libraries
+if(!("plotly" %in% rownames(installed.packages()))) install.packages("plotly")
+if(!("lubridate" %in% rownames(installed.packages()))) install.packages("lubridate")
+if(!("htmlwidgets" %in% rownames(installed.packages()))) install.packages("htmlwidgets")
+if(!("htmltools" %in% rownames(installed.packages()))) install.packages("htmltools")
+if(!("devtools" %in% rownames(installed.packages()))) install.packages("devtools")
+if(!("dygraphs" %in% rownames(installed.packages()))) install.packages("dygraphs")
+if(!("nnet" %in% rownames(installed.packages()))) install.packages("nnet")
+if(!("neuralnet" %in% rownames(installed.packages()))) install.packages("neuralnet")
+if(!("geosphere" %in% rownames(installed.packages()))) install.packages("geosphere")  
+if(!("h2o" %in% rownames(installed.packages()))) install.packages("h2o") # requires source files, www.h2o.ai/download/
+
 # Get zip information from github, for mapping purposes
 GetZips <- function(){
   Zips <- read.table("https://raw.githubusercontent.com/mcandar/Agents/master/US_Postal_Codes_Merged.txt",

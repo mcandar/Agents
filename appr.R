@@ -1971,7 +1971,90 @@ cclist.arrange <- function(raw_cclist,response.col=2){
   colnames(Result) <- colnames(raw_cclist$Source) # set column names
   return(Result)
 }
-                                     
+
+# a comprehensive similariy search, superior than cclist function
+sim.list <- function(xdata,                # first data frame, considered as x
+                     ydata,                # second data frame, considered as y
+                     cat1 = "Category1",   # category names, they will be listed in results
+                     cat2 = "Category2",
+                     type = "correlation", # type, (cross) "correlation" or "covariance"
+                     lag.max = 21,         # maximum lag value to calculate cross-correlation
+                     digits = 6            # number of decimals for precision
+){
+  require(dtw);require(stats)
+  deinit_x <- which(sapply(xdata,function(x) var(x)==0)) # get the columns with zero variance, for xdata
+  deinit_y <- which(sapply(ydata,function(x) var(x)==0)) # get the columns with zero variance, for ydata
+  
+  Result <- lapply(seq.int(ncol(xdata)),function(x){ # outer loop, for x
+    # note that transpose is taken for a better data shape and as.data.frame for use of function "bind_rows"
+    as.data.frame(t(sapply(seq.int(ncol(ydata)),function(y){ # inner loop, for y
+      # calculate cross-correlation and take only numerical values
+      print("I came into core of cclist") # to delete later
+      cat("x =",x,"y =",y,"\n")
+      if(any(deinit_x == x) || any(deinit_y == y)){
+        temp <- as.numeric(rep(0,2*lag.max+1))
+        print("Zero variance encountered.")
+      }
+      else # compute cross-correlations
+        temp <- as.numeric(ccf(xdata[,x],ydata[,y],type = type,lag.max = lag.max,plot = F)$acf)
+      
+      print("I pass ccf")
+      # combine with other values such as max, lag at which the cor is max, rott-mean-square, and CC values
+      c(cat1, # Category1
+        cat2, # Category2
+        colnames(xdata)[x], # StateAbb1
+        colnames(ydata)[y], # StateAbb2
+        
+        chisq.test(xdata[,x],ydata[,y])$p.value, # chi squared
+        dtw(xdata[,x],ydata[,y],distance.only = TRUE)$normalizedDistance, # dynamic time warp
+        max(temp), # MaxCC
+        (which.max(temp)-(lag.max+1)), # MaxCCatLag
+        rms(temp), # RmsCC
+        sum(xdata[,x])/sum(ydata[,y]), # NoSRatio
+        temp) # cross-correlation values,from -lag to +lag
+    })))
+  })
+  
+  Result <- dplyr::bind_rows(Result) # give the final shape, from list to data frame
+  colnames(Result) <- c("Category1","Category2","StateAbb1","StateAbb2","ChiSq.PVal","DTW.NormDist","MaxCC","MaxCCatLag",
+                        "RmsCC","NoSRatio",as.character(-lag.max:lag.max)) # rearrange column names
+  print("In cclist: I'm gonna finally convert them to numeric before return.")
+  
+  # convert to numeric if type list with a function
+  Result[,5:(11+lag.max*2)] <- sapply(Result[,5:(11+lag.max*2)],function(x)
+    round(as.numeric(x),digits = digits)) # set the column types
+  return(Result)
+}
+
+
+# data frame interpolator for daily sale data, first column is day numbers of month, rest are sale figures
+interpolate <- function(daily_sale_data, # daily sale data, first column is days of month, others are daily sale figures
+                        by = 0.1
+){
+  # daynums <- numeric()
+  # for(i in 2:nrow(daily_sale_data)-1){
+  #   if(daily_sale_data$Days[i]>daily_sale_data$Days[i+1])
+  #     daynums <- c(daynums,daily_sale_data$Days[i])
+  #   if(i == nrow(daily_sale_data))
+  #     daynums <- c(daynums,daily_sale_data$Days[i])
+  # }
+  daynums <- c(31,31,30,31,30,31)
+  
+  ind <- numeric()
+  for(i in 1:length(daynums)){
+    if(i==1)
+      ind <-c(ind,seq(daily_sale_data$Days[1],daynums[[i]],by = by))
+    else
+      ind <-c(ind,seq(by,daynums[[i]],by = by))
+  }
+  
+  Result <- sapply(daily_sale_data[,-1],function(x){
+    interpolator <- splinefun(x)
+    interpolator(ind)
+  })
+  
+  return(data.frame(Days=ind,Result))
+}                                     
   
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###

@@ -2086,15 +2086,8 @@ sim.list <- function(xdata,                # first data frame, considered as x
 
 # data frame interpolator for daily sale data, first column is day numbers of month, rest are sale figures
 interpolate <- function(daily_sale_data, # daily sale data, first column is days of month, others are daily sale figures
-                        by = 0.1
+                        by = 0.2
 ){
-  # daynums <- numeric()
-  # for(i in 2:nrow(daily_sale_data)-1){
-  #   if(daily_sale_data$Days[i]>daily_sale_data$Days[i+1])
-  #     daynums <- c(daynums,daily_sale_data$Days[i])
-  #   if(i == nrow(daily_sale_data))
-  #     daynums <- c(daynums,daily_sale_data$Days[i])
-  # }
   daynums <- c(31,31,30,31,30,31)
   
   ind <- numeric()
@@ -2104,14 +2097,14 @@ interpolate <- function(daily_sale_data, # daily sale data, first column is days
     else
       ind <-c(ind,seq(by,daynums[[i]],by = by))
   }
-  
+    
   Result <- sapply(daily_sale_data[,-1],function(x){
     interpolator <- splinefun(x)
-    interpolator(ind)
+    interpolator(seq(1,nrow(daily_sale_data),by = by))
   })
   
   return(data.frame(Days=ind,Result))
-}                                     
+}                                   
   
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###

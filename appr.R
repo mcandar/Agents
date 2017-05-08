@@ -2083,6 +2083,106 @@ sim.list <- function(xdata,                # first data frame, considered as x
   return(Result)
 }
 
+                                                  ##### THIS IS THE LATEST SIM.LIST FUNCTION 06.05.2017 - without significant lags
+sim.list <- function(xdata,                # first data frame, considered as x
+                     ydata,                # second data frame, considered as y
+                     cat1 = "Category1",   # category names, they will be listed in results
+                     cat2 = "Category2",
+                     type = "correlation", # type, (cross) "correlation" or "covariance"
+                     lag.max = 28,         # maximum lag value to calculate cross-correlation
+                     # signif.lags = c(7,14,21,28), # these will be taken
+                     digits = 6            # number of decimals for precision
+){
+  
+  # # significant lags to take and store
+  # if(signif.lags == "all" || signif.lags == "ALL" || is.null(signif.lags)) # take all
+  #   signif.lags <- seq(2*lag.max+1)
+  # else if(max(signif.lags) > lag.max) # take what user need
+  #   signif.lags <- signif.lags[which(signif.lags <= lag.max)]+lag.max+1 # set indexes
+  
+  require(dtw);require(stats)
+  deinit_x <- which(sapply(xdata,function(x) var(x)==0)) # get the columns with zero variance, for xdata
+  deinit_y <- which(sapply(ydata,function(x) var(x)==0)) # get the columns with zero variance, for ydata
+  
+  Result <- lapply(seq.int(ncol(xdata)),function(x){ # outer loop, for x
+    # note that transpose is taken for a better data shape and as.data.frame for use of function "bind_rows"
+    as.data.frame(t(sapply(seq.int(ncol(ydata)),function(y){ # inner loop, for y
+      # calculate cross-correlation and take only numerical values
+      print("I came into core of sim.list") # to delete later
+      cat("x =",x,"y =",y,"\n")
+      if(any(deinit_x == x) || any(deinit_y == y)){
+        temp_prsn <- as.numeric(rep(0,2*lag.max+1))
+        temp_spmn <- temp_prsn
+        pval.chisq <- -1 # in this case chi sq test is not calculated
+        cat("Zero variance encountered at",x,y,"\nCategory 1:",cat1,"\nCategory 2:",cat2,"\n")
+      }
+      else{ # compute cross-correlations
+        # Pearson's product moment coefficient for Cross-Correlation
+        temp_prsn <- as.numeric(ccf(xdata[,x],
+                                    ydata[,y],
+                                    type = type,
+                                    lag.max = lag.max,
+                                    plot = F)$acf)
+        
+        # Spearman's rank correlation coefficient for Cross-Correlation
+        temp_spmn <- as.numeric(ccf(rank(xdata[,x]),
+                                    rank(ydata[,y]),
+                                    type = type,
+                                    lag.max = lag.max,
+                                    plot = F)$acf)
+        
+        pval.chisq <- chisq.test(xdata[,x],ydata[,y])$p.value # chi squared (MC simulation takes too much time!)
+      }
+      print("I pass ccf")
+      
+      # print(temp_prsn)
+      # print(temp_spmn)
+      # maxccatlag_prsn <- which.max(temp_prsn)-(lag.max+1) # MaxCCatLag - pearson
+      # maxccatlag_spmn < which.max(temp_spmn)-(lag.max+1) # MaxCCatLag - spearman 
+      # print(maxccatlag_prsn)
+      # print(maxccatlag_spmn)
+      
+      print("I combine them")
+      # combine with other values such as max, lag at which the cor is max, root-mean-square, and CC values
+      c(cat1, # Category1
+        cat2, # Category2
+        colnames(xdata)[x], # StateAbb1
+        colnames(ydata)[y], # StateAbb2
+        pval.chisq,
+        dtw(xdata[,x],ydata[,y],distance.only = TRUE)$normalizedDistance, # dynamic time warp
+        max(temp_prsn), # MaxCC - pearson
+        max(temp_spmn), # MaxCC - spearman
+        which.max(temp_prsn)-(lag.max+1), # MaxCCatLag - pearson
+        which.max(temp_spmn)-(lag.max+1), # MaxCCatLag - spearman
+        rms(temp_prsn), # RmsCC - pearson
+        rms(temp_spmn), # RmsCC - spearman
+        sum(xdata[,x])/sum(ydata[,y]), # NoSRatio
+        temp_prsn, # pearson cross-correlation values
+        temp_spmn) # spearman cross-correlation values
+    })))
+  })
+  
+  lagnms_prsn <- paste("P",as.character(seq(lag.max*2+1)-lag.max-1),sep = ".") # nomenclature for
+  lagnms_spmn <- paste("S",as.character(seq(lag.max*2+1)-lag.max-1),sep = ".") # output data frame
+  # print(lagnms_prsn)
+  # print(lagnms_spmn)
+  
+  Result <- dplyr::bind_rows(Result) # give the final shape, from list to data frame
+  
+  print("I bound rows now I'm gonna name them.")
+  print(head(Result))
+  print(ncol(Result))
+  colnames(Result) <- c("Category1","Category2","StateAbb1","StateAbb2","ChiSq.PVal","DTW.NormDist","Prsn.MaxCC",
+                        "Spmn.MaxCC","Prsn.MaxCCatLag","Spmn.MaxCCatLag","Prsn.RmsCC","Spmn.RmsCC","NoSRatio",
+                        lagnms_prsn,lagnms_spmn)
+  
+  print("In cclist: I'm gonna finally convert them to numeric before return.")
+  
+  # convert to numeric if type list with a function
+  Result[,5:(13+(2*lag.max+1)*2)] <- sapply(Result[,5:(13+(2*lag.max+1)*2)],function(x)
+    round(as.numeric(x),digits = digits)) # set the column types
+  return(Result)
+}
 
 # data frame interpolator for daily sale data, first column is day numbers of month, rest are sale figures
 interpolate <- function(daily_sale_data, # daily sale data, first column is days of month, others are daily sale figures

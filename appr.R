@@ -1733,15 +1733,14 @@ sales.daily.perElement <- function(raw_sale, # sale data (raw or arranged) for p
 # input a list, function will search its elements in raw_sale in the column index col.target
 # and return the number of sales per given element, daily
 # for example: input the some zip numbers, it will list how many products are sold in one month to those zips
-# WORKS FOR ONLY ONE YEAR
+# WORKS ONLY FOR ONE YEAR
 par.sales.daily.perElement <- function(raw_sale,       # target data frame
                                        source,         # source, as vector or list, this will be searched inside raw_sale
                                        col.target,     # column number to select in target frame
                                        cl = NULL,      # specify a cluster or leave it null for function initiates itself
                                        nthreads = NULL # number of threads to use
 ){
-  require(lubridate)
-  require(parallel)
+  require(lubridate);require(parallel)
   
   dates <- as.Date(raw_sale$ShippingDate) # entire date column
   mnths <- as.integer(levels(factor(month(dates)))) # just how many different months there are
@@ -1756,13 +1755,12 @@ par.sales.daily.perElement <- function(raw_sale,       # target data frame
   }
   else
     stopcl <- FALSE
-  print("I go into for loop")
+  
   output <- data.frame() # final output
   for(i in 1:length(mnths)){ # for all months included in the raw_sale dataframe
     raw_temp <- raw_sale[which(month(dates)==mnths[i]),] # take data only for current month
-    print("I came to parsapply")
     Result <- parSapply(cl,source,function(x){ 
-      temp <- raw_temp[which(raw_temp[,col.target]==x),c(2,7)] # only shipping date and unitsshipped
+      temp <- raw_temp[which(raw_temp[,col.target]==x),c("ShippingDate","UnitsShipped")] # only shipping date and unitsshipped
       sapply(seq.int(daynum[i]),function(y) 
         sum(na.omit(temp$UnitsShipped[which(day(as.character(temp$ShippingDate))==y)])))
     })
@@ -1974,116 +1972,7 @@ cclist.arrange <- function(raw_cclist,response.col=2){
   return(Result)
 }
 
-# a comprehensive similariy search, superior than cclist function
-sim.list <- function(xdata,                # first data frame, considered as x
-                     ydata,                # second data frame, considered as y
-                     cat1 = "Category1",   # category names, they will be listed in results
-                     cat2 = "Category2",
-                     type = "correlation", # type, (cross) "correlation" or "covariance"
-                     lag.max = 28,         # maximum lag value to calculate cross-correlation
-                     signif.lags = c(7,14,21,28), # these will be taken
-                     digits = 6            # number of decimals for precision
-){
-  
-  # significant lags to take and store
-  if(signif.lags == "all" || signif.lags == "ALL" || is.null(signif.lags)) # take all
-    signif.lags <- seq(2*lag.max+1)
-  else if(max(signif.lags) > lag.max) # take what user need
-    signif.lags <- signif.lags[which(signif.lags <= lag.max)]+lag.max+1 # set indexes
-  
-  require(dtw);require(stats)
-  deinit_x <- which(sapply(xdata,function(x) var(x)==0)) # get the columns with zero variance, for xdata
-  deinit_y <- which(sapply(ydata,function(x) var(x)==0)) # get the columns with zero variance, for ydata
-  
-  Result <- lapply(seq.int(ncol(xdata)),function(x){ # outer loop, for x
-    # note that transpose is taken for a better data shape and as.data.frame for use of function "bind_rows"
-    as.data.frame(t(sapply(seq.int(ncol(ydata)),function(y){ # inner loop, for y
-      # calculate cross-correlation and take only numerical values
-      print("I came into core of sim.list") # to delete later
-      cat("x =",x,"y =",y,"\n")
-      if(any(deinit_x == x) || any(deinit_y == y)){
-        temp_prsn <- as.numeric(rep(0,2*lag.max+1))[signif.lags]
-        temp_spmn <- temp_prsn
-        pval.chisq <- -1 # in this case chi sq test is not calculated
-        cat("Zero variance encountered at",x,y,"\nCategory 1:",cat1,"\nCategory 2:",cat2,"\n")
-      }
-      else{ # compute cross-correlations
-        # Pearson's product moment coefficient for Cross-Correlation
-        temp_prsn <- as.numeric(ccf(xdata[,x],
-                                    ydata[,y],
-                                    type = type,
-                                    lag.max = lag.max,
-                                    plot = F)$acf)[signif.lags]
-        
-        # Spearman's rank correlation coefficient for Cross-Correlation
-        temp_spmn <- as.numeric(ccf(rank(xdata[,x]),
-                                    rank(ydata[,y]),
-                                    type = type,
-                                    lag.max = lag.max,
-                                    plot = F)$acf)[signif.lags]
-        
-        pval.chisq <- chisq.test(xdata[,x],ydata[,y])$p.value # chi squared (MC simulation takes too much time!)
-      }
-      print("I pass ccf")
-      if(length(signif.lags) == 2*lag.max+1){ # find max correlation, if including all lag values
-        maxccatlag_prsn <- which.max(temp_prsn)-(lag.max+1) # MaxCCatLag - pearson
-        maxccatlag_spmn < which.max(temp_spmn)-(lag.max+1) # MaxCCatLag - spearman 
-        # lagnms_prsn <- paste("P",as.character(signif.lags-lag.max-1),sep = ".") # nomenclature for
-        # lagnms_spmn <- paste("S",as.character(signif.lags-lag.max-1),sep = ".") # output data frame
-        # print("All inclusive.")
-      }
-      else{ # find max correlation, if including what user specified
-        maxccatlag_prsn <- signif.lags[which.max(temp_prsn)] # MaxCCatLag - pearson
-        maxccatlag_spmn <- signif.lags[which.max(temp_spmn)] # MaxCCatLag - spearman
-        # lagnms_prsn <- paste("P",as.character(signif.lags),sep = ".")
-        # print(lagnms_prsn)
-        # lagnms_spmn <- paste("S",as.character(signif.lags),sep = ".")
-        # print(lagnms_spmn)
-        # print("Partial.")
-      }
-      
-      # combine with other values such as max, lag at which the cor is max, root-mean-square, and CC values
-      c(cat1, # Category1
-        cat2, # Category2
-        colnames(xdata)[x], # StateAbb1
-        colnames(ydata)[y], # StateAbb2
-        pval.chisq,
-        dtw(xdata[,x],ydata[,y],distance.only = TRUE)$normalizedDistance, # dynamic time warp
-        max(temp_prsn), # MaxCC - pearson
-        max(temp_spmn), # MaxCC - spearman
-        maxccatlag_prsn, # MaxCCatLag - pearson
-        maxccatlag_spmn, # MaxCCatLag - spearman
-        rms(temp_prsn), # RmsCC - pearson
-        rms(temp_spmn), # RmsCC - spearman
-        sum(xdata[,x])/sum(ydata[,y]), # NoSRatio
-        temp_prsn, # pearson cross-correlation values
-        temp_spmn) # spearman cross-correlation values
-    })))
-  })
-  
-  lagnms_prsn <- paste("P",as.character(signif.lags),sep = ".") # nomenclature for
-  lagnms_spmn <- paste("S",as.character(signif.lags),sep = ".") # output data frame
-  print(lagnms_prsn)
-  print(lagnms_spmn)
-  
-  Result <- dplyr::bind_rows(Result) # give the final shape, from list to data frame
-  
-  print("I bound rows now I'm gonna name them.")
-  print(head(Result))
-  print(ncol(Result))
-  colnames(Result) <- c("Category1","Category2","StateAbb1","StateAbb2","ChiSq.PVal","DTW.NormDist","Prsn.MaxCC",
-                        "Spmn.MaxCC","Prsn.MaxCCatLag","Spmn.MaxCCatLag","Prsn.RmsCC","Spmn.RmsCC","NoSRatio",
-                        lagnms_prsn,lagnms_spmn)
-  
-  print("In cclist: I'm gonna finally convert them to numeric before return.")
-  
-  # convert to numeric if type list with a function
-  Result[,5:(13+length(signif.lags)*2)] <- sapply(Result[,5:(13+length(signif.lags)*2)],function(x)
-    round(as.numeric(x),digits = digits)) # set the column types
-  return(Result)
-}
-
-                                                  ##### THIS IS THE LATEST SIM.LIST FUNCTION 06.05.2017 - without significant lags
+##### THIS IS THE LATEST SIM.LIST FUNCTION 06.05.2017 - without significant lags
 sim.list <- function(xdata,                # first data frame, considered as x
                      ydata,                # second data frame, considered as y
                      cat1 = "Category1",   # category names, they will be listed in results

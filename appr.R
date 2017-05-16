@@ -2120,7 +2120,7 @@ h2o.buildandtest <- function(data, # the feed dataset
   # prepare thedata frames
   train <- h2o.assign(as.h2o(data[tra.ind,]),"train.hex")
   valid <- h2o.assign(as.h2o(data[val.ind,]),"valid.hex")
-  test <- h2o.assign(as.h2o(data[tes.ind,]),"test.hex")
+  # test <- h2o.assign(as.h2o(data[tes.ind,]),"test.hex")
   
   model <- h2o.deeplearning(training_frame = train,
                             validation_frame = valid,
@@ -2134,6 +2134,11 @@ h2o.buildandtest <- function(data, # the feed dataset
     print(model@model$scoring_history)
   }
   
+  ## test data rearrangement, eve the data is amplified, just use the real values to test
+  test <- data[tes.ind,] # form dataset
+  test <- test[unlist(lapply(test$Days,is.integer)),] # take just integer days, rest is interpolation and not real
+  test <- h2o.assign(as.h2o(test),"test.hex") # convert to h2o
+    
   prediction <- h2o.predict(object = model,newdata = test)
   Result <- data.frame(Prediction=as.data.frame(as.numeric(prediction)),
                        Real=as.data.frame(as.numeric(test))[,response.col]) # store predictions and real values in a data frame
@@ -2145,7 +2150,30 @@ h2o.buildandtest <- function(data, # the feed dataset
   cat("\nCorrelations of Prediction and Real Values :",cor(Result$predict,Result$Real))
   
   return(Result)
-}                                            
+}
+
+# not flexible, should be improved, but works fine
+h2o.plotresult <- function(data,
+                           # test.days, # prediction, number of days, no more than one month (for now)
+                           title = "Monitor Category Sales Prediction for Montana",
+                           subtitle = "", # to give model info
+                           filename = NULL # name of the file if wanted to save, should be with ".html" extension
+){
+  library(xts);library(highcharter)
+  test.days <- nrow(data)
+  dates <- seq.Date(as.Date(paste("2012-12-",32-test.days,sep = "")),as.Date("2012-12-31"),by = 1)
+  
+  hc <- highchart() %>% 
+    hc_title(text = title) %>% 
+    hc_subtitle(text = subtitle) %>% 
+    hc_add_series_times_values(dates = dates,values = data$predict, id = "Prediction",name = "Prediction") %>% 
+    hc_add_series_times_values(dates = dates,values = data$Real, id = "Observed",name = "Observed")
+  
+  if(!is.null(filename))
+    htmlwidgets::saveWidget(hc,filename)
+  
+  return(hc)
+}                                           
 
 # not flexible but goal-oriented
 # should be improved, but works fine

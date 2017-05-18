@@ -2198,7 +2198,81 @@ h2o.plotresult <- function(data,
   
   return(hc)
 }                                             
+
+# PARALLEL VERSION.                                            
+# parallelized cclist function for a comprehensive similarity analyses                                            
+par.simlist.source <- function(raw_cclist, # output of cclist function, better to be filtered and reduced
+                               raw_big, # a location data added sale data, should contain all categories for raw_cclist
+                               info.col = 5:13,
+                               col.states.raw_big = 16,
+                               filename = NULL, # prompt a string if you want to save to file, include file extension(.csv)
+                               nthreads = NULL
+                               ){
+  library(foreach);library(doParallel);
   
+  init_c <- as.character(levels(factor(raw_cclist$Category2))) # initialize all category names
+  c_names <- paste(raw_cclist$Category1[1],raw_cclist$StateAbb1[1],sep = "_") # get just names to set before return
+  
+  temp_info <- foreach(i = 1:length(init_c),.combine = rbind) %do%{
+    # get state info for a given category
+    temp_states <- as.character(levels(factor(raw_cclist[which(raw_cclist$Category2==init_c[i]),4]))) # get state names
+    # initialize with category and states
+    nms <- data.frame(Cat=init_c[i],State=temp_states)
+    
+    info <- foreach(j = 1:nrow(nms),.combine = rbind) %do% {
+      as.data.frame(raw_cclist[which(as.character(raw_cclist$Category2) == nms[j,1] &
+                                       as.character(raw_cclist$StateAbb2) == nms[j,2]),info.col])
+    }
+    
+    data.frame(Cat = nms$Cat, State = nms$State,info)
+  }
+  
+  temp_colnames <- foreach(i = 1:length(init_c),.combine = c) %do%{
+    # get state info for a given category
+    temp_states <- as.character(levels(factor(raw_cclist[which(raw_cclist$Category2==init_c[i]),4]))) # get state names
+    # bring together category name with states to prepare column names
+    paste(init_c[i],temp_states,sep = "_")
+  }
+  
+  c_names <- c("Days",c_names,temp_colnames) # bring altogether to give final shape of the column names
+  
+  print("I start parallel section.")
+  if(is.null(nthreads)) 
+    nthreads <- detectCores()
+  force(c(raw_cclist,raw_big,info.col))
+  cl<-makeCluster(nthreads)
+  registerDoParallel(cl)
+  Result <- foreach(i = 1:length(init_c),
+                  .combine = cbind,
+                  .export = c("which.containingString","sales.daily.perElement")) %dopar%{ 
+    # get state info for a given category
+    temp_states <- as.character(levels(factor(raw_cclist[which(raw_cclist$Category2==init_c[i]),4]))) # get state names
+    # take just the current category from big data
+    temp <- raw_big[which.containingString(raw_big$ItemDescription,init_c[i],index = 1),]
+    # search for the current state sales in that data
+    temp <- sales.daily.perElement(temp,temp_states,col.states.raw_big)
+    # print("I have done an iteration.")
+    return(temp[,-1])
+  }
+  closeAllConnections()
+  
+  print("I have completed the parallel section.")
+  temp <- raw_big[which.containingString(raw_big$ItemDescription,raw_cclist$Category1[1],index = 1),] # get corresp. data
+  temp <- sales.daily.perElement(temp,as.character(raw_cclist$StateAbb1[1]),col.states.raw_big) # get daily sale figures
+  Result <- cbind(temp,Result)
+  colnames(Result) <- c_names
+  
+  if(!is.null(filename)){
+    write.csv(temp,paste("SourceData",filename,sep = "_"),row.names = FALSE)
+    write.csv(temp_info,paste("LagData",filename,sep = "_"),row.names = FALSE)
+    cat("Files",paste("SourceData",filename,sep = "_"),"and",paste("LagData",filename,sep = "_"),
+        "are saved to",getwd(),"\n")
+  }
+  
+  return(list(Source=temp,Lag=temp_info))
+}                                            
+                                            
+                                            
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###
 ### ----------------------------------------------------------------------- ###

@@ -1709,24 +1709,30 @@ par.which.containingString <- function(x, # the vector to be searched if it cont
 # works for ONE YEAR!
 sales.daily.perElement <- function(raw_sale, # sale data (raw or arranged) for preferably one category
                                    source, # the quantity which will be searched for
-                                   col.target){ # target column of the sale data which will be searched in
+                                   col.target,
+                                   force.sixmonths=FALSE){ # target column of the sale data which will be searched in
   require(lubridate)
   dates <- as.Date(raw_sale$ShippingDate) # entire date column
-  mnths <- as.integer(levels(factor(month(dates)))) # just how many different months there are
+  if(force.sixmonths)
+    mnths <- 7:12
+  else
+    mnths <- as.integer(levels(factor(month(dates)))) # just how many different months there are
+  
   daynum <- days_in_month(as.Date(paste(2012,mnths,1,sep = "-"))) # get each month's total day numbers
   
   output <- data.frame()
   for(i in 1:length(mnths)){ # for all months included in the raw_sale dataframe
     raw_temp <- raw_sale[which(month(dates)==mnths[i]),] # take data only for current month
     Result <- sapply(source,function(x){ 
-      temp <- raw_temp[which(raw_temp[,col.target]==x),c(2,7)] # only shipping date and unitsshipped
+      temp <- raw_temp[which(raw_temp[,col.target]==x),c("ShippingDate","UnitsShipped")] # only shipping date and unitsshipped, was c(2,7)
       sapply(seq.int(daynum[i]),function(y) 
         sum(na.omit(temp$UnitsShipped[which(day(temp$ShippingDate)==y)])))
     })
     output <- rbind(output,data.frame(Days=seq.int(daynum[i]),Result))
   }
+  output <- sapply(output,as.numeric)
   return(output)
-}                 
+}             
 
 # PARALLEL VERSION
 # THIS IS NOT FOR MULTIPLE CATEGORIES, WORKS FOR JUST ONE CATEGORY, MULTIPLE MONTHS!

@@ -2213,7 +2213,7 @@ par.simlist.source <- function(raw_cclist, # output of cclist function, better t
                                col.states.raw_big = 16,
                                filename = NULL, # prompt a string if you want to save to file, include file extension(.csv)
                                nthreads = NULL
-                               ){
+){
   library(foreach);library(doParallel);
   
   init_c <- as.character(levels(factor(raw_cclist$Category2))) # initialize all category names
@@ -2240,42 +2240,65 @@ par.simlist.source <- function(raw_cclist, # output of cclist function, better t
     paste(init_c[i],temp_states,sep = "_")
   }
   
+  temp_states <- lapply(init_c,function(x)
+    as.character(levels(factor(raw_cclist[which(raw_cclist$Category2==x),"StateAbb2"]))) # get state names
+  )
+  
   c_names <- c("Days",c_names,temp_colnames) # bring altogether to give final shape of the column names
+  
+  ### FRACTIONATE THE DATA ###
+  stepnum <- as.integer((object.size(raw_big)/1e8)*1.5) # determine the number of steps according to file size
+  k <- seq(nrow(raw_big))
+  max <- as.integer(length(k)/stepnum) # number of indices per step 
+  ind <- split(k, ceiling(k/max))
+  cat("\nI'm gonna do this in",length(ind),"steps.\n")
+  final_list <- list() # initialize to fill in later
   
   print("I start parallel section.")
   if(is.null(nthreads)) 
     nthreads <- detectCores()
-  force(c(raw_cclist,raw_big,info.col))
-  cl<-makeCluster(nthreads)
-  registerDoParallel(cl)
-  Result <- foreach(i = 1:length(init_c),
-                  .combine = cbind,
-                  .export = c("which.containingString","sales.daily.perElement")) %dopar%{ 
-    # get state info for a given category
-    temp_states <- as.character(levels(factor(raw_cclist[which(raw_cclist$Category2==init_c[i]),4]))) # get state names
-    # take just the current category from big data
-    temp <- raw_big[which.containingString(raw_big$ItemDescription,init_c[i],index = 1),]
-    # search for the current state sales in that data
-    temp <- sales.daily.perElement(temp,temp_states,col.states.raw_big)
-    # print("I have done an iteration.")
-    return(temp[,-1])
+  
+  Result <- list() # initialize to fill in later
+  ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+  for(i in 1:length(ind)){
+    cat("\nStep",i,"of",length(ind),"\n")
+    raw_big_temp <- raw_big[ind[[i]],]
+    force(c(raw_cclist,raw_big_temp,info.col))
+    cl<-makeCluster(nthreads)
+    registerDoParallel(cl)
+    Result[[i]] <- foreach(i = 1:length(init_c),
+                      .combine = cbind,
+                      .export = c("which.containingString","sales.daily.perElement")) %dopar%{ 
+                        # get state info for a given category
+                        # temp_states <- as.character(levels(factor(raw_cclist[which(raw_cclist$Category2==init_c[i]),"StateAbb2"]))) # get state names
+                        # take just the current category from big data
+                        temp <- raw_big_temp[which.containingString(raw_big_temp$ItemDescription,init_c[i],index = 1),]
+                        # search for the current state sales in that data
+                        temp <- sales.daily.perElement(temp,temp_states[[i]],col.states.raw_big,force.sixmonths = TRUE)
+                        # print("I have done an iteration.")
+                        temp[,-1]
+                      }
+    closeAllConnections()
+    # print(Result)
   }
-  closeAllConnections()
+  ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+
+  Result <- Reduce("+",Result) # sum all of them
   
   print("I have completed the parallel section.")
   temp <- raw_big[which.containingString(raw_big$ItemDescription,raw_cclist$Category1[1],index = 1),] # get corresp. data
-  temp <- sales.daily.perElement(temp,as.character(raw_cclist$StateAbb1[1]),col.states.raw_big) # get daily sale figures
+  temp <- sales.daily.perElement(temp,as.character(raw_cclist$StateAbb1[1]),
+                                 col.states.raw_big,force.sixmonths = TRUE) # get daily sale figures
   Result <- cbind(temp,Result)
   colnames(Result) <- c_names
   
   if(!is.null(filename)){
-    write.csv(temp,paste("SourceData",filename,sep = "_"),row.names = FALSE)
+    write.csv(Result,paste("SourceData",filename,sep = "_"),row.names = FALSE)
     write.csv(temp_info,paste("LagData",filename,sep = "_"),row.names = FALSE)
     cat("Files",paste("SourceData",filename,sep = "_"),"and",paste("LagData",filename,sep = "_"),
         "are saved to",getwd(),"\n")
   }
-  
-  return(list(Source=temp,Lag=temp_info))
+  return(list(Source=as.data.frame(Result),Lag=temp_info))
 }                                            
                                             
                                             

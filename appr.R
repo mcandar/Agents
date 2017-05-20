@@ -2142,7 +2142,8 @@ h2o.buildandtest <- function(data, # the feed dataset
   
   ## test data rearrangement, eve the data is amplified, just use the real values to test
   test <- data[tes.ind,] # form dataset
-  test <- test[unlist(lapply(test$Days,is.integer)),] # take just integer days, rest is interpolation and not real
+  # test <- test[unlist(lapply(test$Days,is.integer)),] # take just integer days, rest is interpolation and not real
+  test <- test[which((test$Days %% 1)==0),] # take just integer days, rest is interpolation and not real
   test <- h2o.assign(as.h2o(test),"test.hex") # convert to h2o
     
   prediction <- h2o.predict(object = model,newdata = test)

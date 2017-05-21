@@ -2080,10 +2080,13 @@ sim.list <- function(xdata,                # first data frame, considered as x
 }
 
 # data frame interpolator for daily sale data, first column is day numbers of month, rest are sale figures
+### CHANGED TO HELP TIME REARRANGEMENTS
 interpolate <- function(daily_sale_data, # daily sale data, first column is days of month, others are daily sale figures
-                        by = 0.2
+                        by = 0.5,
+                        months = 6 # number of months to take starting from the end
 ){
-  daynums <- c(31,31,30,31,30,31)
+  daynums <- c(31,31,30,31,30,31)[(6-months+1):6] # indices trims from the beginning
+  # daynums <- c(31,30,31,30,31) # 5 months only
   
   ind <- numeric()
   for(i in 1:length(daynums)){
@@ -2092,14 +2095,15 @@ interpolate <- function(daily_sale_data, # daily sale data, first column is days
     else
       ind <-c(ind,seq(by,daynums[[i]],by = by))
   }
-    
+  
   Result <- sapply(daily_sale_data[,-1],function(x){
     interpolator <- splinefun(x)
     interpolator(seq(1,nrow(daily_sale_data),by = by))
   })
   
   return(data.frame(Days=ind,Result))
-}                                   
+}  
+                               
                                             
 # this is a quick model builder and tester function for h2o.deeplearning, ANN's
 # not so flexible, goal-oriented                                            

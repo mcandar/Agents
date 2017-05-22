@@ -2161,30 +2161,7 @@ h2o.buildandtest <- function(data, # the feed dataset
   cat("\nCorrelations of Prediction and Real Values :",cor(Result$predict,Result$Real))
   
   return(Result)
-}
-
-# not flexible, should be improved, but works fine
-h2o.plotresult <- function(data,
-                           # test.days, # prediction, number of days, no more than one month (for now)
-                           title = "Monitor Category Sales Prediction for Montana",
-                           subtitle = "", # to give model info
-                           filename = NULL # name of the file if wanted to save, should be with ".html" extension
-){
-  library(xts);library(highcharter)
-  test.days <- nrow(data)
-  dates <- seq.Date(as.Date(paste("2012-12-",32-test.days,sep = "")),as.Date("2012-12-31"),by = 1)
-  
-  hc <- highchart() %>% 
-    hc_title(text = title) %>% 
-    hc_subtitle(text = subtitle) %>% 
-    hc_add_series_times_values(dates = dates,values = data$predict, id = "Prediction",name = "Prediction") %>% 
-    hc_add_series_times_values(dates = dates,values = data$Real, id = "Observed",name = "Observed")
-  
-  if(!is.null(filename))
-    htmlwidgets::saveWidget(hc,filename)
-  
-  return(hc)
-}                                           
+}                                     
 
 # not flexible but goal-oriented
 # should be improved, but works fine
@@ -2304,8 +2281,54 @@ par.simlist.source <- function(raw_cclist, # output of cclist function, better t
         "are saved to",getwd(),"\n")
   }
   return(list(Source=as.data.frame(Result),Lag=temp_info))
-}                                            
+}
                                             
+## CHECKAND CONFIRMED FINAL VERSION, TRIMS THE DATA SET VERY LESS
+simlist.align <- function(raw_cclist_source, # source data of a raw_cclist similarities data
+                          lag.col, # column of lags to consider for alignment
+                          response.col=2 # the column which will be predicted
+){
+  
+  # filter minus lags
+  lagind <- which(raw_cclist_source$Lag[,lag.col] >= 0)
+  raw_cclist_source$Lag <- raw_cclist_source$Lag[lagind,]
+  raw_cclist_source$Source <- raw_cclist_source$Source[,c(1,2,lagind+2)]
+  
+  trim <- max(raw_cclist_source$Lag[,lag.col])-min(raw_cclist_source$Lag[,lag.col])
+  print(trim)
+  
+  # initiate with target vector, this will be predicted
+  maxlag <- max(raw_cclist_source$Lag[,lag.col])
+  Result <- data.frame(Days=raw_cclist_source$Source$Days[seq(nrow(raw_cclist_source$Source)-trim)],
+                       Response=c(raw_cclist_source$Source[(maxlag+1):nrow(raw_cclist_source$Source),response.col],
+                                  rep(NA,min(raw_cclist_source$Lag[,lag.col])))) # fill the blanks with NA's
+  nrow(Result)
+  
+  for(i in seq((nrow(raw_cclist_source$Lag)))+1){
+    currentlag <- raw_cclist_source$Lag[i-1,lag.col] # get lag value
+    print(currentlag)
+    trim_temp <- max(raw_cclist_source$Lag[,lag.col])-currentlag
+    # temp <- raw_cclist_source$Source[seq(nrow(raw_cclist_source$Source)-currentlag),i+1] # apply lags
+    temp <- raw_cclist_source$Source[seq(nrow(raw_cclist_source$Source)-trim)+trim_temp,i+1] # apply lags
+    print(seq(nrow(raw_cclist_source$Source)-trim)+trim_temp)
+    print(temp)
+    Result <- cbind(Result,temp) # take just matching part, according to max lag
+  }
+  
+  colnames(Result) <- colnames(raw_cclist_source$Source) # set column names
+  return(Result)
+}                                            
+
+# binds as a list                                            
+simlist.bind <- function(raw_cclist_source_1,raw_cclist_source_2)
+  list(Source=as.data.frame(cbind(raw_cclist_source_1$Source,raw_cclist_source_2$Source[,-c(1,2)])),
+       Lag=as.data.frame(rbind(raw_cclist_source_1$Lag,raw_cclist_source_2$Lag)))
+
+# excludes repeated values as a list
+simlist.unique <- function(raw_cclist_source)
+  list(Source=as.data.frame(t(unique(t(raw_cclist_source$Source)))),
+       Lag=as.data.frame(unique(raw_cclist_source$Lag)))                                            
+                 
                                             
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###

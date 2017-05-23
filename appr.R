@@ -2169,23 +2169,35 @@ h2o.plotresult <- function(data,
                            # test.days, # prediction, number of days, no more than one month (for now)
                            title = "Monitor Category Sales Prediction for Montana",
                            subtitle = "", # to give model info
+                           beyond_data = FALSE,
                            filename = NULL # name of the file if wanted to save, should be with ".html" extension
-                           ){
+){
   library(xts);library(highcharter)
   test.days <- nrow(data)
-  dates <- seq.Date(as.Date(paste("2012-12-",32-test.days,sep = "")),as.Date("2012-12-31"),by = 1)
-
-  hc <- highchart() %>% 
-    hc_title(text = title) %>% 
-    hc_subtitle(text = subtitle) %>% 
-    hc_add_series_times_values(dates = dates,values = data$predict, id = "Prediction",name = "Prediction") %>% 
-    hc_add_series_times_values(dates = dates,values = data$Real, id = "Observed",name = "Observed")
+  if(!beyond_data){
+    dates <- seq.Date(as.Date(paste("2012-12-",32-test.days,sep = "")),as.Date("2012-12-31"),by = 1)
+    
+    hc <- highchart() %>% 
+      hc_title(text = title) %>% 
+      hc_subtitle(text = subtitle) %>% 
+      hc_add_series_times_values(dates = dates,values = data$predict, id = "Prediction",name = "Prediction") %>% 
+      hc_add_series_times_values(dates = dates,values = data$Real, id = "Observed",name = "Observed")
+  }
+  else{
+    dates <- seq.Date(as.Date("2013-01-01"),as.Date(paste("2013-01-",test.days,sep = "")),by = 1)
+    
+    hc <- highchart() %>% 
+      hc_title(text = title) %>% 
+      hc_subtitle(text = subtitle) %>% 
+      hc_add_series_times_values(dates = dates,values = data$predict, id = "Prediction",name = "Prediction")
+  }
   
   if(!is.null(filename))
     htmlwidgets::saveWidget(hc,filename)
   
   return(hc)
-}                                             
+}
+                                           
 
 # PARALLEL VERSION.                                            
 # parallelized cclist function for a comprehensive similarity analyses                                            

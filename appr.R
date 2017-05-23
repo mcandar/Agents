@@ -2330,6 +2330,42 @@ simlist.unique <- function(raw_cclist_source)
        Lag=as.data.frame(unique(raw_cclist_source$Lag)))                                            
                  
                                             
+# cut function for similarity lists
+# FILTER AS LIST
+simlist.filterAslist <- function(raw_cclist_source,
+                                 filter.col,
+                                 filter.val=NULL,
+                                 take = "greater",
+                                 percentage=NULL,
+                                 decreasing = TRUE){
+  zero_var <- which(sapply(raw_cclist_source$Source,var)==0)-2 # get zero variances and adapt to combine with ind
+  if(length(zero_var)!=0){
+    print("Zero variances found and excluded.")
+    raw_cclist_source$Lag <- raw_cclist_source$Lag[-zero_var,]
+    raw_cclist_source$Source <- raw_cclist_source$Source[,-c(zero_var+2)]
+  }
+  
+  ###
+  if(!is.null(percentage)){ # get with percentage,i.e. 10% of the best 20% of the best etc.
+    ind <- order(raw_cclist_source$Lag[,filter.col],decreasing = decreasing)
+    ind <- ind[seq(length(ind)*(percentage/100))] # take first 10% of all elements
+  }
+  else if(is.null(percentage)){ # static cut
+    if(take == "greater")
+      ind <- which(raw_cclist_source$Lag[,filter.col] >= filter.val) # make the cut
+    else if(take == "less")
+      ind <- which(raw_cclist_source$Lag[,filter.col] <= filter.val) # make the cut
+    else if(take == "equal")
+      ind <- which(raw_cclist_source$Lag[,filter.col] %in% filter.val) # make the cut
+  }
+  ###
+  
+  raw_cclist_source$Lag <- raw_cclist_source$Lag[ind,]
+  raw_cclist_source$Source <- raw_cclist_source$Source[,c(1,2,ind+2)]
+  return(raw_cclist_source)
+}
+                                   
+    
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###
 ### ----------------------------------------------------------------------- ###

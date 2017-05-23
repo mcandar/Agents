@@ -2364,6 +2364,107 @@ simlist.filterAslist <- function(raw_cclist_source,
   raw_cclist_source$Source <- raw_cclist_source$Source[,c(1,2,ind+2)]
   return(raw_cclist_source)
 }
+    
+    
+### ------------------------------------------------- ###
+### - 2ND VERSION ----------------------------------- ###
+### ------------------------------------------------- ###
+h2o.buildandtest2 <- function(data, # the feed dataset
+                             test.row, # number of DAYS to predict starting from the end
+                             valid.row, # number of DAYS to use in validation starting from test
+                             train.row="rest",
+                             response.col=2,
+                             beyond_data=FALSE, # compare
+                             # max.lag = 31,
+                             interpolation.step = NULL,
+                             use.onlyreal = TRUE,
+                             nthreads = -1,
+                             plot = FALSE,
+                             errorinfo = FALSE,
+                             ...
+){
+  library(h2o)
+  h2o.init(nthreads = nthreads,min_mem_size = "6G")
+  h2o.removeAll()
+  
+  if(!is.null(interpolation.step)){ # apply interpolation
+    data <- interpolate(data,by = interpolation.step,months = 5)
+    interpolation.factor <- 1/interpolation.step
+  }
+  else # do not apply interpolation
+    interpolation.factor <- 1
+  
+  lag <- length(which(is.na(data[,response.col])))
+  
+  # indices to fractionate the data frame
+  if(beyond_data){ # cannot be comparable with real data, because this indexing is for predicting beyond the data
+    tes.ind <-  seq(interpolation.factor*test.row)+nrow(data)-interpolation.factor*test.row
+    print(tes.ind)
+    val.ind <-  seq(interpolation.factor*valid.row)+nrow(data)-interpolation.factor*valid.row-length(tes.ind)
+    print(val.ind)
+    if(train.row == "rest" || train.row == "Rest" || is.null(train.row))
+      tra.ind <- seq(nrow(data)-length(tes.ind)-length(val.ind))
+    print(tra.ind)
+  }
+  else{ # can be comparable with real data, prediction is inside the limits
+    tes.ind <-  seq(interpolation.factor*test.row)+nrow(data)-interpolation.factor*test.row-lag
+    print(tes.ind)
+    val.ind <-  seq(interpolation.factor*valid.row)+nrow(data)-interpolation.factor*valid.row-length(tes.ind)-lag
+    print(val.ind)
+    if(train.row == "rest" || train.row == "Rest" || is.null(train.row))
+      tra.ind <- seq(nrow(data)-length(tes.ind)-length(val.ind)-lag)
+    print(tra.ind)
+  }
+  
+  # prepare thedata frames
+  train <- h2o.assign(as.h2o(data[tra.ind,]),"train.hex")
+  valid <- h2o.assign(as.h2o(data[val.ind,]),"valid.hex")
+  # test <- h2o.assign(as.h2o(data[tes.ind,]),"test.hex")
+  
+  model <- h2o.deeplearning(training_frame = train,
+                            validation_frame = valid,
+                            x=seq(ncol(Result))[-c(response.col)],
+                            y=response.col,
+                            ...)
+  
+  if(errorinfo){
+    print(model@model$validation_metrics)
+    print(model@model$model_summary)
+    print(model@model$scoring_history)
+  }
+  
+  ## test data rearrangement, when the data is amplified, just use the real values to test
+  test_init <- data[tes.ind,] # form dataset
+  if(use.onlyreal)
+    test <- test_init[which((test_init$Days %% 1)==0),] # take just integer days, rest is interpolation and not real
+  else if(!use.onlyreal)
+    test <- test_init # take with interpolation values
+  
+  # print(test)
+  test <- h2o.assign(as.h2o(test),"test.hex") # convert to h2o
+  
+  prediction <- h2o.predict(object = model,newdata = test)
+  # print(as.data.frame(as.numeric(data[rel.ind[1:test.row],response.col])))
+  if(!beyond_data){
+    Result <- data.frame(Prediction=as.data.frame(as.numeric(prediction)),
+                         Real=as.data.frame(as.numeric(test))[,response.col]) # store predictions and real values in a data frame
+    colnames(Result) <- c("predict","Real")
+    print(Result)
+    # display error info
+    cat("\nRoot-Mean-Squared Error of Predictions :",rms(Result$predict-Result$Real))
+    cat("\nRoot-Mean-Squared Error of Predictions Per Day:",rms(Result$predict-Result$Real)/test.row,"or",
+        (rms(Result$predict-Result$Real)/sum(na.omit(Result$Real)))*100,"%")
+    cat("\nCorrelations of Prediction and Real Values :",cor(Result$predict,Result$Real))
+  }
+  else
+    Result <- data.frame(Prediction=as.data.frame(as.numeric(prediction)),
+                         Real=NA) # store predictions and real values in a data frame
+  
+  return(list(Result=Result,Model=model,Int=test_init))
+}
+### ------------------------------------------------- ###
+### ------------------------------------------------- ###
+### ------------------------------------------------- ###    
                                    
     
 ### ----------------------------------------------------------------------- ###

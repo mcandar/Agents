@@ -2435,7 +2435,7 @@ h2o.buildandtest2 <- function(data, # the feed dataset
   
   model <- h2o.deeplearning(training_frame = train,
                             validation_frame = valid,
-                            x=seq(ncol(Result))[-c(response.col)],
+                            x=seq(ncol(data))[-c(response.col)],
                             y=response.col,
                             ...)
   

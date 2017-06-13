@@ -1,6 +1,6 @@
 ## hurriyet proj lib
 
-source("https://raw.githubusercontent.com/mcandar/Agents/master/clicklib.R")
+# source("https://raw.githubusercontent.com/mcandar/Agents/master/clicklib.R")
 
 ## data import with ease
 clickstream.import <- function(filename)

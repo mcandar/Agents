@@ -58,3 +58,7 @@ clickstream.organize <- function(data, # click data to read
   
   return(data)
 }
+
+# merge 5 columns of a row as a datetie object with format "yyyy-mm-dd HH:MM:SS"
+merge.datetime.mins <- function(data)
+  lubridate::as_datetime(paste(paste(data[,1],data[,2],data[,3],sep = "-"),paste(data[,4],data[,5],sep = ":")))

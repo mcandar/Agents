@@ -1,5 +1,7 @@
 ## hurriyet proj lib
 
+source("https://raw.githubusercontent.com/mcandar/Agents/master/clicklib.R")
+
 ## data import with ease
 clickstream.import <- function(filename)
   read.csv(filename,row.names = NULL,stringsAsFactors = FALSE,na.strings = "null")

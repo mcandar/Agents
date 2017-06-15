@@ -62,3 +62,35 @@ clickstream.organize <- function(data, # click data to read
 # merge 5 columns of a row as a datetie object with format "yyyy-mm-dd HH:MM:SS"
 merge.datetime.mins <- function(data)
   lubridate::as_datetime(paste(paste(data[,1],data[,2],data[,3],sep = "-"),paste(data[,4],data[,5],sep = ":")))
+
+perc.error <- function(query,reference){
+  if(length(query)==1){
+    print("Error on single value.")
+    if(reference == 0)
+      return("Can't calculate due to zero divide.")
+    return((abs(query-reference)/reference)*100)
+  }
+  else{
+    print("Mean error on elementwise values.")
+    df <- data.frame(query=query,reference=reference)
+    df <- df[-which(df$reference == 0),] # exclude zero divisions
+    return(mean(na.omit((abs(df$query-df$reference)/df$reference)*100)))
+  }
+}
+
+# split datetime into columns AND REDUCE INTO HOURLY INTERVALS (FOR PV)
+clickstream.splitDatetime <- function(data,breaks = "hours",...){
+  min <- data.frame(PV = table(cut(data[which(data$ev_nm == "PV"),"srvr_tm"], breaks="hours",...)))
+  print("I do split.")
+  library(lubridate)
+  # min$PV.Var1 <- as_datetime(min$PV.Var1)
+  temp <- strsplit(as.character(as_datetime(min$PV.Var1)),split = " ")
+  temp <- t(as.data.frame(temp))
+  rownames(temp) <- seq(nrow(temp))
+  temp <- cbind(t(as.data.frame(strsplit(temp[,1],split = "-"))),t(as.data.frame(strsplit(temp[,2],split = ":"))))
+  temp <- as.data.frame(apply(temp,2,function(x) as.integer(as.character(x))))
+  temp$V6 <- NULL
+  colnames(temp) <- c("year","month","day","hour","min")
+  min <- data.frame(temp,PV=min$PV.Freq)
+  return(min)
+}

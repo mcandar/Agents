@@ -24,6 +24,8 @@ if(!("geosphere" %in% rownames(installed.packages()))) install.packages("geosphe
 if(!("dtw" %in% rownames(installed.packages()))) install.packages("dtw")
 if(!("highcharter" %in% rownames(installed.packages()))) install.packages("highcharter")
 if(!("h2o" %in% rownames(installed.packages()))) install.packages("h2o") # requires source files, www.h2o.ai/download/
+if(!("webshot" %in% rownames(installed.packages()))) install.packages("webshot")
+if(!("RPostgreSQL" %in% rownames(installed.packages()))) install.packages("RPostgreSQL")
 
 # Get zip information from github, for mapping purposes
 GetZips <- function(){

@@ -59,9 +59,9 @@ clickstream.organize <- function(data, # click data to read
   return(data)
 }
 
-# merge 5 columns of a row as a datetie object with format "yyyy-mm-dd HH:MM:SS"
+# merge columns of a row as a datetie object with format "yyyy-mm-dd HH:MM:SS"
 merge.datetime.mins <- function(data)
-  lubridate::as_datetime(paste(paste(data[,1],data[,2],data[,3],sep = "-"),paste(data[,4],data[,5],sep = ":")))
+  lubridate::as_datetime(paste(paste(data[,1],data[,2],data[,3],sep = "-"),paste(data[,4],data[,5],sep = ":")),tz = "GMT")
 
 perc.error <- function(query,reference){
   if(length(query)==1){
@@ -72,25 +72,78 @@ perc.error <- function(query,reference){
   }
   else{
     print("Mean error on elementwise values.")
-    df <- data.frame(query=query,reference=reference)
-    df <- df[-which(df$reference == 0),] # exclude zero divisions
-    return(mean(na.omit((abs(df$query-df$reference)/df$reference)*100)))
+    temp <- data.frame(query=query,reference=reference)
+    ind <- which(temp$reference == 0)
+    if(length(ind)!=0)
+      temp <- temp[-ind,] # exclude zero divisions
+    return(mean(na.omit((abs(temp$query-temp$reference)/temp$reference)*100)))
   }
 }
 
 # split datetime into columns AND REDUCE INTO HOURLY INTERVALS (FOR PV)
-clickstream.splitDatetime <- function(data,breaks = "hours",...){
-  min <- data.frame(PV = table(cut(data[which(data$ev_nm == "PV"),"srvr_tm"], breaks="hours",...)))
-  print("I do split.")
+clickstream.splitDatetime <- function(data,col.datetime,breaks = "hours",splitOnly=FALSE,...){
+  if(!splitOnly){
+    min <- data.frame(PV = table(cut(data[which(data$ev_nm == "PV"),"srvr_tm"], breaks="hours",...)))
+    print("I do split.")
+  }
+  else{
+    min <- data
+    print("I skip splitting.")
+  }
+  
   library(lubridate)
-  # min$PV.Var1 <- as_datetime(min$PV.Var1)
-  temp <- strsplit(as.character(as_datetime(min$PV.Var1)),split = " ")
+  temp <- strsplit(as.character(as_datetime(min[,col.datetime])),split = " ")
   temp <- t(as.data.frame(temp))
   rownames(temp) <- seq(nrow(temp))
   temp <- cbind(t(as.data.frame(strsplit(temp[,1],split = "-"))),t(as.data.frame(strsplit(temp[,2],split = ":"))))
   temp <- as.data.frame(apply(temp,2,function(x) as.integer(as.character(x))))
   temp$V6 <- NULL
   colnames(temp) <- c("year","month","day","hour","min")
-  min <- data.frame(temp,PV=min$PV.Freq)
+  min <- data.frame(temp,min[,-col.datetime])
   return(min)
 }
+
+
+holidays.2017 <- function(data,col.datetime){
+  require(lubridate)
+  holidays <- data.frame(year = rep(2017,16), 
+                         month = c(1,4,5,5,6,6,6,6,8,8,9,9,9,9,10,10), 
+                         day = c(1,23,1,19,24,25,26,27,30,31,1,2,3,4,28,29))
+  
+  Result <- apply(data.frame(year(data$datetime),month(data$datetime),day(data$datetime)),1,function(x){
+    temp <- matrix(as.numeric(x),nrow = nrow(holidays),ncol = 3,byrow = T)
+    any(((temp[,1] - holidays[,1]) == 0) & ((temp[,2] - holidays[,2]) == 0) & ((temp[,3] - holidays[,3]) == 0))
+  })
+  
+  return(Result)
+}
+
+####THIS WORKS 
+split.Datetime <- function(x){
+  library(lubridate)
+  temp <- strsplit(as.character(as_datetime(x)),split = " ")
+  temp <- t(as.data.frame(temp))
+  rownames(temp) <- seq(nrow(temp))
+  temp <- cbind(t(as.data.frame(strsplit(temp[,1],split = "-"))),t(as.data.frame(strsplit(temp[,2],split = ":"))))
+  temp <- as.data.frame(apply(temp,2,function(x) as.integer(as.character(x))))
+  temp$V6 <- NULL
+  colnames(temp) <- c("year","month","day","hour","min")
+  return(temp)
+}
+
+
+## be careful about timezones, keep the tz arguments as "GMT"
+merge.datetime.mins <- function(data)
+  as.POSIXct(paste(paste(data[,1],data[,2],data[,3],sep = "-"),paste(data[,4],data[,5],sep = ":")),tz = "GMT")
+
+hidden.toStr <- function(hidden){
+  len <- length(hidden)
+  if(all(hidden == hidden[1]) & len > 1)
+    return(paste(len,hidden[1],sep = "x"))
+  if(all(hidden == hidden[1]) & len == 1)
+    return(paste(len,hidden,sep = "x"))
+  else
+    return(hidden)
+}
+
+# merge.datetime.mins(df[,6:10])

@@ -146,4 +146,17 @@ hidden.toStr <- function(hidden){
     return(hidden)
 }
 
-# merge.datetime.mins(df[,6:10])
+# for easy-import of hourly generated pv counts                              
+clickstream.importHourly <- function(filename,time_interval=NULL){
+  result <- read.csv(filename,row.names = NULL,stringsAsFactors=FALSE)
+  colnames(result) <- c("date","hour","pv")
+  ### DONT FORGET TO ADD tz = "GMT" otherwise it will adapt to gmt and add or subtract some time
+  result$datetime <- as.POSIXct(paste(result$date,paste(result$hour,"00",sep = ":")),tz = "GMT") # get the time as is
+  if(is.null(time_interval))
+    return(data.frame(Datetime=result$datetime,PV=result$pv))
+  else{
+    result <- result[which(result$datetime %in% time_interval),]
+    result <- result[order(result$datetime),]
+    return(data.frame(Datetime=result$datetime,PV=result$pv))
+  }
+}

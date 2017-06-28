@@ -224,7 +224,7 @@ clickstream.matchDatetime <- function(datalist, # bring all dataframes in a list
     
     # colnames(temp) <- paste(names(datalist)[i],colnames())
     result <- cbind(result,temp)
-    index <- seq(specify_columns_toinclude)+(n*(i))-1
+    index <- seq(n)+(n*(i))-(n-1)
     colnames(result)[index] <- paste(names(datalist)[i],colnames(datalist[[i]])[specify_columns_toinclude],sep = "_")
     print(index)
   }

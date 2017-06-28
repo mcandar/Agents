@@ -136,6 +136,8 @@ split.Datetime <- function(x){
 merge.datetime.mins <- function(data)
   as.POSIXct(paste(paste(data[,1],data[,2],data[,3],sep = "-"),paste(data[,4],data[,5],sep = ":")),tz = "GMT")
 
+
+## no treatment for NULL values, omit them
 hidden.toStr <- function(hidden){
   len <- length(hidden)
   if(all(hidden == hidden[1]) & len > 1)
@@ -146,17 +148,104 @@ hidden.toStr <- function(hidden){
     return(hidden)
 }
 
-# for easy-import of hourly generated pv counts                              
+
 clickstream.importHourly <- function(filename,time_interval=NULL){
   result <- read.csv(filename,row.names = NULL,stringsAsFactors=FALSE)
   colnames(result) <- c("date","hour","pv")
   ### DONT FORGET TO ADD tz = "GMT" otherwise it will adapt to gmt and add or subtract some time
   result$datetime <- as.POSIXct(paste(result$date,paste(result$hour,"00",sep = ":")),tz = "GMT") # get the time as is
   if(is.null(time_interval))
-    return(data.frame(Datetime=result$datetime,PV=result$pv))
+    return(data.frame(datetime=result$datetime,PV=result$pv))
   else{
     result <- result[which(result$datetime %in% time_interval),]
     result <- result[order(result$datetime),]
-    return(data.frame(Datetime=result$datetime,PV=result$pv))
+    return(data.frame(datetime=result$datetime,PV=result$pv))
   }
 }
+
+# if a dataset is directly taken from redshift, convert it to more convenient form
+# does not change timezones
+clickstream.toHourly <- function(result,time_interval=NULL){
+  colnames(result) <- c("date","hour","pv")
+  result$datetime <- as.POSIXct(paste(result$date,paste(result$hour,"00",sep = ":")),tz = "GMT") # get the time as is
+  if(is.null(time_interval))
+    return(data.frame(datetime=result$datetime,PV=result$pv))
+  else{
+    result <- result[which(result$datetime %in% time_interval),]
+    result <- result[order(result$datetime),]
+    return(data.frame(datetime=result$datetime,PV=result$pv))
+  }
+}
+
+
+
+## should be tested!
+## TREAT WEEKENDS IN DIFFERENT WAYS
+clickstream.importCurrencies <- function(filename, # filename to import
+                                         time_interval = NULL, # specify a time sequence, exclude non-matching
+                                         time_frame = "H1", # only works for H1 for now
+                                         tz = "" # local time is default
+                                         ){
+  ohlc_colnames <- c("date","time","open","high","low","close","volume")
+  if(time_frame == "H1"){
+    result <- read.csv(filename,row.names = NULL,header = FALSE,stringsAsFactors = FALSE)
+    colnames(result) <- ohlc_colnames
+    result$datetime <- as.POSIXct(paste(result$date," ",
+                                        result$time,":00",sep = ""),
+                                  format = "%Y.%m.%d %H:%M",
+                                  tz = tz)# subtracts 3 hours to adapt gmt
+    
+    if(is.null(time_interval))
+      return(result[,c(8,3:7)])
+    else{
+      result <- result[which(result$datetime %in% time_interval),]
+      result <- result[order(result$datetime),]
+      return(result[,c(8,3:7)])
+    }
+  }
+}
+
+
+## input data frames into a list, and this will get the rows with common datetime info, specified as "time_interval"
+clickstream.matchDatetime <- function(datalist, # bring all dataframes in a list
+                                      time_interval, # a time sequence to take a basis
+                                      column_datetime, # the column index of the dataframes to check datetime
+                                      specify_columns_toinclude = NULL # which columns do you want to include?
+){
+  result <- data.frame(datetime=time_interval) # output as a dataframe
+  n <- length(specify_columns_toinclude)
+  for(i in 1:length(datalist)){
+    if(is.null(specify_columns_toinclude))
+      specify_columns_toinclude <- seq(ncol(datalist[[i]]))
+    ## in current element of the list, just take the time-matching rows
+    # print(head(datalist[[i]]))
+    temp <- datalist[[i]][which(datalist[[i]][,column_datetime] %in% 
+                                  time_interval),specify_columns_toinclude]
+    
+    # colnames(temp) <- paste(names(datalist)[i],colnames())
+    result <- cbind(result,temp)
+    index <- seq(specify_columns_toinclude)+(n*(i))-1
+    colnames(result)[index] <- paste(names(datalist)[i],colnames(datalist[[i]])[specify_columns_toinclude],sep = "_")
+    print(index)
+  }
+  # colnames(result) <- c("datetime",as.character(paste("V",seq(ncol(result)-1)+1,sep = "")))
+  return(result)
+}
+
+
+#### GET THEM ALL TOGETHER LIKE METHODS OF A CLASS
+clickstream <- list(import = clickstream.import,
+                    importCurrencies = clickstream.importCurrencies,
+                    organize = clickstream.organize,
+                    importHourly = clickstream.importHourly,
+                    toHourly = clickstream.toHourly,
+                    splitDatetime = clickstream.splitDatetime,
+                    matchDatetime = clickstream.matchDatetime,
+                    merge.datetime.mins = merge.datetime.mins,
+                    perc.error = perc.error,
+                    hidden.toStr = hidden.toStr,
+                    split.Datetime = split.Datetime,
+                    holidays.2017 = holidays.2017
+                    )
+
+

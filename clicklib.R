@@ -2,6 +2,22 @@
 
 # source("https://raw.githubusercontent.com/mcandar/Agents/master/clicklib.R")
 
+# Required Libraries
+if(!("plotly" %in% rownames(installed.packages()))) install.packages("plotly")
+if(!("lubridate" %in% rownames(installed.packages()))) install.packages("lubridate")
+if(!("htmlwidgets" %in% rownames(installed.packages()))) install.packages("htmlwidgets")
+if(!("htmltools" %in% rownames(installed.packages()))) install.packages("htmltools")
+if(!("devtools" %in% rownames(installed.packages()))) install.packages("devtools")
+if(!("dygraphs" %in% rownames(installed.packages()))) install.packages("dygraphs")
+if(!("nnet" %in% rownames(installed.packages()))) install.packages("nnet")
+if(!("neuralnet" %in% rownames(installed.packages()))) install.packages("neuralnet")
+if(!("geosphere" %in% rownames(installed.packages()))) install.packages("geosphere")
+if(!("dtw" %in% rownames(installed.packages()))) install.packages("dtw")
+if(!("highcharter" %in% rownames(installed.packages()))) install.packages("highcharter")
+if(!("h2o" %in% rownames(installed.packages()))) install.packages("h2o") # requires source files, www.h2o.ai/download/
+if(!("webshot" %in% rownames(installed.packages()))) install.packages("webshot")
+if(!("RPostgreSQL" %in% rownames(installed.packages()))) install.packages("RPostgreSQL")
+
 ## data import with ease
 clickstream.import <- function(filename)
   read.csv(filename,row.names = NULL,stringsAsFactors = FALSE,na.strings = "null")

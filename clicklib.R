@@ -18,6 +18,9 @@ if(!("h2o" %in% rownames(installed.packages()))) install.packages("h2o") # requi
 if(!("webshot" %in% rownames(installed.packages()))) install.packages("webshot")
 if(!("RPostgreSQL" %in% rownames(installed.packages()))) install.packages("RPostgreSQL")
 
+rms <- function(x)
+  sqrt(mean(x^2))
+
 ## data import with ease
 clickstream.import <- function(filename)
   read.csv(filename,row.names = NULL,stringsAsFactors = FALSE,na.strings = "null")
@@ -780,7 +783,8 @@ clickstream <- list(import = clickstream.import,
                     perc.error = perc.error,
                     hidden.toStr = hidden.toStr,
                     split.Datetime = split.Datetime,
-                    holidays.2017 = holidays.2017
+                    holidays.2017 = holidays.2017,
+                    rms = rms
                     )
 
 

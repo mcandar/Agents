@@ -733,10 +733,11 @@ clickstream.h2o.gridBuildandtest <- function(data, # the feed dataset
   models.sorted <- h2o.getGrid(grid_id = "deep_models", sort_by = sort_by)
   
   test <- h2o.assign(as.h2o(data[tes.ind,]),"test.hex") # convert to h2o
+  indices <- list(training=tra.ind,validation=val.ind,test=tes.ind)
   
   Result <- list()
   models.applied <- list()
-  specs <- as.data.frame(matrix(nrow = 0,ncol = 4))
+  specs <- as.data.frame(matrix(nrow = 0,ncol = 6))
   if(!beyond_data){
     for(i in 1:length(models.sorted@model_ids)){
       current_model <- h2o.getModel(models.sorted@model_ids[[i]]) # get current model
@@ -749,7 +750,9 @@ clickstream.h2o.gridBuildandtest <- function(data, # the feed dataset
       temp_err <- c(rms(res$predict-res[,2]),
                     rms(res$predict-res[,2])/test.row,
                     (rms(res$predict-res[,2])/sum(na.omit(res[,2])))*100,
-                    cor(res$predict,res[,2]))
+                    cor(res$predict,res[,2]),
+                    round(as.numeric(perc.error(sum(res$predict),sum(res[,2]))),2), # whole error
+                    round(perc.error(res$predict,res[,2]),2)) # elementwise_error
       specs[i,] <- temp_err # record the errors at each step
       cat("\nRoot-Mean-Squared Error of Predictions :",temp_err[1])
       cat("\nRoot-Mean-Squared Error of Predictions Per Element:",temp_err[2],"or",temp_err[3],"%")
@@ -767,9 +770,102 @@ clickstream.h2o.gridBuildandtest <- function(data, # the feed dataset
       specs[i,] <- NA # no errors calculation at all since there is no data to compare
     }
   }
-  
+  colnames(specs) <- c("rms","rmsPerEl.","percRmsPerEl.","cor","whole_err","el.wise_err")
   print(length(models.sorted@model_ids))
-  return(list(Result=Result,Model=models.applied,Int=test,Specs=specs))
+  return(list(Result=Result,Model=models.applied,Int=as.data.frame(test),Specs=specs,Indices=indices,ResponseColumn=response.col))
+}
+
+
+#### PLOT THE MODEL PREDICTIONS
+clickstream.h2o.plotGrid <- function(grid.models, # output of the function clickstream.h2o.gridBuiltandtest
+                                     # test,
+                                     plot_output_prefix, # final output file's name prefix
+                                     title_prefix, ## beginning of each plot title
+                                     subtitle_prefix, ## beginning of each plot subtitle
+                                     include = 10, # include first 10 elements (default)
+                                     datetime.cols = 6:10
+){
+  
+  require(highcharter)
+  
+  # get the dates
+  temp.dates <- merge.datetime.mins(as.data.frame(grid.models$Int)[,datetime.cols])
+  print(temp.dates)
+  
+  beyond_data <- all(is.na(as.data.frame(temp$Int)[,grid.models$ResponseColumn])) # wheter forecasting beyond the data or not
+  
+  plots <- list()
+  for(i in seq(include)){
+    cat("Step",i,"\n")
+    # temp.dates <- merge.datetime.mins(as.data.frame(test)[,datetime.cols]) # merge the datetime columns
+    # dates <- seq.POSIXt(min(temp.dates),max(temp.dates),by = "hours") # make a time sequence along oldest and newest date
+    
+    # add annotations and explanations to titles
+    algorithm <- grid.models$Model[[1]]@algorithm
+    switch(algorithm,
+           "deeplearning" = {algo_name <- list(full="Artificial Neural Networks",abb="ANN",prefix="_ann_")
+           annot_text <- paste("Hidden:",hidden.toStr(grid.models$Model[[i]]@allparameters$hidden),"<br>",
+                               "Epoch:",grid.models$Model[[i]]@allparameters$epochs,"<br>",
+                               "Runtime:",grid.models$Model[[i]]@allparameters$max_runtime_secs,"secs <br>",
+                               "Activation:",grid.models$Model[[i]]@allparameters$activation,"<br>",
+                               "Stopping Rounds:",grid.models$Model[[i]]@allparameters$stopping_rounds,"<br>",
+                               "Stopping Tolerance:",grid.models$Model[[i]]@allparameters$stopping_tolerance,"<br>")},
+           
+           "drf" = {algo_name <- list(full="Random Forests",abb="RF",prefix="_rf_")
+           annot_text <- paste("Number of Trees:",grid.models$Model[[i]]@allparameters$ntrees,"<br>",
+                               "Maximum Depth:",grid.models$Model[[i]]@allparameters$max_depth,"<br>",
+                               "Minimum Rows:",grid.models$Model[[i]]@allparameters$min_rows,"<br>",
+                               "Number of Bins:",grid.models$Model[[i]]@allparameters$nbins,"<br>",
+                               "Max Depth:",grid.models$Model[[i]]@allparameters$stopping_rounds,"<br>",
+                               "Sample Rate:",grid.models$Model[[i]]@allparameters$sample_rate,"<br>")},
+           
+           "gbm" = {algo_name <- list(full="Gradient Boost Machines",abb="GBM",prefix="_gbm_")
+           annot_text <- paste("Number of Trees:",grid.models$Model[[i]]@allparameters$ntrees,"<br>",
+                               "Maximum Depth:",grid.models$Model[[i]]@allparameters$max_depth,"<br>",
+                               "Minimum Rows:",grid.models$Model[[i]]@allparameters$min_rows,"<br>",
+                               "Max Depth:",grid.models$Model[[i]]@allparameters$stopping_rounds,"<br>",
+                               "Col Sample Rate:",grid.models$Model[[i]]@allparameters$col_sample_rate,"<br>",
+                               "Col Sample Rate Per Tree:",grid.models$Model[[i]]@allparameters$col_sample_rate_per_tree,"<br>",
+                               "Sample Rate:",grid.models$Model[[i]]@allparameters$sample_rate,"<br>")})
+    print("I pass switch")
+    if(!beyond_data){
+      hc <- highchart() %>% 
+        hc_title(text = paste(title_prefix,"with",algo_name$full)) %>%  # rearrange the title and subtitle !!!!
+        hc_subtitle(text = paste(subtitle_prefix,"Results of the optimization process, ",algo_name$abb," Model ",i,
+                                 ". Error on total: ",grid.models$Specs$whole_err[[i]],"%, Average of elementwise errors:",
+                                 grid.models$Specs$el.wise_err[[i]],"%",sep = "")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[i]][,1], id = "Prediction",name = "Prediction") %>% 
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[i]][,2], id = "Observed",name = "Observed") %>%
+        hc_add_annotation(title = list(text = annot_text,
+                                       style = list(color = rgb(0.3,0.3,0.3), # dark gray
+                                                    fontFamily = "Lucida Sans Unicode")), # same font with titles
+                          x = 125,y = 170)
+    }
+    else{
+      hc <- highchart() %>% 
+        hc_title(text = paste(title_prefix,"with",algo_name$full)) %>%  # rearrange the title and subtitle !!!!
+        hc_subtitle(text = paste(subtitle_prefix,"Results of the optimization process, ",algo_name$abb," Model ",i,
+                                 ".",sep = "")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[i]][,1], id = "Prediction",name = "Prediction") %>%
+        hc_add_annotation(title = list(text = annot_text,
+                                       style = list(color = rgb(0.3,0.3,0.3), # dark gray
+                                                    fontFamily = "Lucida Sans Unicode")), # same font with titles
+                          x = 125,y = 170)
+    }
+    
+    plots[[i]] <- hc
+  }
+  
+  # fix nomenclature
+  cat("Top 10 among",length(gbm.sorted.grid@model_ids),algo_name$abb,"models were plotted.\n")
+  canv <- hw_grid(plots,ncol = 2,rowheight = 400) # make a canvas of plots
+  
+  htmltools::save_html(canv,paste(plot_output_prefix,algo_name$prefix,ID,".html",sep = ""))
+  webshot::webshot(url = paste(plot_output_prefix,algo_name$prefix,ID,".html",sep = ""),
+                   file = paste(plot_output_prefix,algo_name$prefix,ID,".png",sep = ""),vwidth = 1200)
+  cat("The canvas",plot_output_prefix,algo_name$prefix,ID,"is saved to",getwd(),"\n")
+  
+  return(canv)
 }
 
 
@@ -786,6 +882,7 @@ clickstream <- list(import = clickstream.import,
                     h2o.buildandtest = clickstream.h2o.buildandtest,
                     h2o.plotresult = clickstream.h2o.plotresult,
                     h2o.gridBuildandtest = clickstream.h2o.gridBuildandtest,
+                    h2o.plotGrid = clickstream.h2o.plotGrid,
                     simlist = clickstream.simlist,
                     merge.datetime.mins = merge.datetime.mins,
                     perc.error = perc.error,

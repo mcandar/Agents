@@ -16,7 +16,7 @@ if(!("dtw" %in% rownames(installed.packages()))) install.packages("dtw")
 if(!("highcharter" %in% rownames(installed.packages()))) install.packages("highcharter")
 if(!("h2o" %in% rownames(installed.packages()))) install.packages("h2o") # requires source files, www.h2o.ai/download/
 if(!("webshot" %in% rownames(installed.packages()))) install.packages("webshot")
-if(!("RPostgreSQL" %in% rownames(installed.packages()))) install.packages("RPostgreSQL")
+if(!("RPostgreSQL" %in% rownames(installed.packages()))) install.packages("RPostgreSQL") # fails in linux
 
 rms <- function(x)
   sqrt(mean(x^2))
@@ -382,7 +382,7 @@ clickstream.h2o.buildandtest <- function(data, # the feed dataset
                                          ...
 ){
   library(h2o)
-  h2o.init(nthreads = nthreads,min_mem_size = "6G")
+  h2o.init(nthreads = nthreads)#,min_mem_size = "6G")
   h2o.removeAll()
   
   if(!is.null(interpolation.step)){ # apply interpolation
@@ -735,33 +735,41 @@ clickstream.h2o.gridBuildandtest <- function(data, # the feed dataset
   test <- h2o.assign(as.h2o(data[tes.ind,]),"test.hex") # convert to h2o
   
   Result <- list()
-  
+  models.applied <- list()
+  specs <- as.data.frame(matrix(nrow = 0,ncol = 4))
   if(!beyond_data){
     for(i in 1:length(models.sorted@model_ids)){
       current_model <- h2o.getModel(models.sorted@model_ids[[i]]) # get current model
+      models.applied[[i]] <- current_model
       pred <- h2o.predict(object = current_model,newdata = test) # make predictions
       res <- data.frame(predict = as.data.frame(pred),Real = as.data.frame(test[,response])) # store in a df
       print(res)
       Result[[i]] <- res
       # display error info
-      cat("\nRoot-Mean-Squared Error of Predictions :",rms(res$predict-res[,2]))
-      cat("\nRoot-Mean-Squared Error of Predictions Per Element:",rms(res$predict-res[,2])/test.row,"or",
-          (rms(res$predict-res[,2])/sum(na.omit(res[,2])))*100,"%")
-      cat("\nCorrelations of Prediction and Real Values :",cor(res$predict,res[,2]))
+      temp_err <- c(rms(res$predict-res[,2]),
+                    rms(res$predict-res[,2])/test.row,
+                    (rms(res$predict-res[,2])/sum(na.omit(res[,2])))*100,
+                    cor(res$predict,res[,2]))
+      specs[i,] <- temp_err # record the errors at each step
+      cat("\nRoot-Mean-Squared Error of Predictions :",temp_err[1])
+      cat("\nRoot-Mean-Squared Error of Predictions Per Element:",temp_err[2],"or",temp_err[3],"%")
+      cat("\nCorrelations of Prediction and Real Values :",temp_err[4])
     }
   }
   else{
     for(i in 1:length(models.sorted)){
       current_model <- h2o.getModel(models.sorted@model_ids[[i]]) # get current model
+      models.applied[[i]] <- current_model
       pred <- h2o.predict(object = current_model,newdata = test) # make predictions
       res <- data.frame(predict = as.data.frame(pred),Real = NA) # store in a df
       print(res)
       Result[[i]] <- res
+      specs[i,] <- NA # no errors calculation at all since there is no data to compare
     }
   }
   
   print(length(models.sorted@model_ids))
-  return(list(Result=Result,Model=models.sorted,Int=test))
+  return(list(Result=Result,Model=models.applied,Int=test,Specs=specs))
 }
 
 

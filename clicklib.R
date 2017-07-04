@@ -880,7 +880,17 @@ clickstream.h2o.plotGridstack <- function(grid.models, # output of the function 
          "drf" = {algo_name <- list(full="Random Forests",abb="RF",prefix="_rf_")},
          
          "gbm" = {algo_name <- list(full="Gradient Boost Machines",abb="GBM",prefix="_gbm_")})
-  # print("I pass switch")
+  
+  temp <- dplyr::bind_cols(grid.models$Result)[,seq(2*include)] # get first 10 predictions
+  temp <- temp[,seq(1,(include*2)-1,by = 2)] # take just prediction columns
+  
+  avs <- apply(temp,1,mean) %>% round(2) # average
+  
+  # prepare the data frame in desired shape for highcharter arearange
+  mydata <- data.frame(date = datetime_to_timestamp(temp.dates),
+                       low = apply(temp,1,min) %>% round(2),
+                       high = apply(temp,1,max) %>% round(2)) %>% list_parse2()
+  
   if(include==10){
     if(!beyond_data){
       we_mean <- mean(grid.models$Specs$whole_err[1:10])
@@ -900,7 +910,14 @@ clickstream.h2o.plotGridstack <- function(grid.models, # output of the function 
         hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[8]][,1], id = paste(algo_name$abb,"Model 8"),name = paste(algo_name$abb,"Model 8")) %>%
         hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[9]][,1], id = paste(algo_name$abb,"Model 9"),name = paste(algo_name$abb,"Model 9")) %>%
         hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[10]][,1], id = paste(algo_name$abb,"Model 10"),name = paste(algo_name$abb,"Model 10")) %>%
-        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[1]][,2], id = "Observed",name = "Observed")# %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[1]][,2], id = "Observed",name = "Observed")
+      
+      hc_area <- highchart(type = type) %>% 
+        hc_title(text = paste(title_prefix,"with",algo_name$full)) %>%  # rearrange the title and subtitle !!!!
+        hc_subtitle(text = paste(subtitle_prefix,"Results of the optimization process, ",algo_name$abb," Model ",i,".",sep = "")) %>%
+        hc_add_series(data = mydata,type = "arearange",name = "band",id = "band") %>%
+        hc_add_series_times_values(dates = temp.dates,values = avs, id = "ave",name = "ave") %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[1]][,2], id = "Observed",name = "Observed")
     }
     else{
       hc <- highchart(type = type) %>% 
@@ -915,25 +932,15 @@ clickstream.h2o.plotGridstack <- function(grid.models, # output of the function 
         hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[7]][,1], id = paste(algo_name$abb,"Model 7"),name = paste(algo_name$abb,"Model 7")) %>%
         hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[8]][,1], id = paste(algo_name$abb,"Model 8"),name = paste(algo_name$abb,"Model 8")) %>%
         hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[9]][,1], id = paste(algo_name$abb,"Model 9"),name = paste(algo_name$abb,"Model 9")) %>%
-        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[10]][,1], id = paste(algo_name$abb,"Model 10"),name = paste(algo_name$abb,"Model 10"))# %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[10]][,1], id = paste(algo_name$abb,"Model 10"),name = paste(algo_name$abb,"Model 10"))
+      
+      hc_area <- highchart(type = type) %>% 
+        hc_title(text = paste(title_prefix,"with",algo_name$full)) %>%  # rearrange the title and subtitle !!!!
+        hc_subtitle(text = paste(subtitle_prefix,"Results of the optimization process, ",algo_name$abb," Model ",i,".",sep = "")) %>%
+        hc_add_series(data = mydata,type = "arearange",name = "band",id = "band") %>%
+        hc_add_series_times_values(dates = temp.dates,values = avs, id = "ave",name = "ave")
     }
   }
-  
-  temp <- dplyr::bind_cols(grid.models$Result)[,seq(2*include)] # get first 10 predictions
-  ind <- apply(temp,2,function(x) all(!is.na(x))) # NA's excluded
-  temp <- temp[,ind]
-  
-  avs <- apply(temp,1,mean) %>% round(2) # average
-  
-  mydata <- data.frame(date = datetime_to_timestamp(temp.dates),
-                       low = apply(temp,1,min) %>% round(2),
-                       high = apply(temp,1,max) %>% round(2)) %>% list_parse2()
-  
-  hc_area <- highchart(type = type) %>% 
-    hc_title(text = paste(title_prefix,"with",algo_name$full)) %>%  # rearrange the title and subtitle !!!!
-    hc_subtitle(text = paste(subtitle_prefix,"Results of the optimization process, ",algo_name$abb," Model ",i,".",sep = "")) %>%
-    hc_add_series(data = mydata,type = "arearange",name = "band",id = "band") %>%
-    hc_add_series_times_values(dates = temp.dates,values = avs, id = "ave",name = "ave")
   
   return(list(stack=hc,interval=hc_area))
 }

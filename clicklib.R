@@ -373,7 +373,8 @@ clickstream.h2o.buildandtest <- function(data, # the feed dataset
                                          response.col=2,
                                          algorithm = "deeplearning",
                                          beyond_data=FALSE, # compare
-                                         # max.lag = 31,
+                                         min_mem_size = "6G",
+                                         remove_negatives = TRUE,
                                          interpolation.step = NULL,
                                          # use.onlyreal = TRUE,
                                          nthreads = -1,
@@ -382,7 +383,7 @@ clickstream.h2o.buildandtest <- function(data, # the feed dataset
                                          ...
 ){
   library(h2o)
-  h2o.init(nthreads = nthreads)#,min_mem_size = "6G")
+  h2o.init(nthreads = nthreads,min_mem_size = "6G")
   h2o.removeAll()
   
   if(!is.null(interpolation.step)){ # apply interpolation
@@ -444,8 +445,11 @@ clickstream.h2o.buildandtest <- function(data, # the feed dataset
   }
   
   test <- h2o.assign(as.h2o(data[tes.ind,]),"test.hex") # convert to h2o
+  indices <- list(training=tra.ind,validation=val.ind,test=tes.ind)
   
   prediction <- h2o.predict(object = model,newdata = test)
+  prediction <- as.data.frame(prediction)
+  if(remove_negatives) prediction[which(prediction[,1]<0),] <- 0
   
   if(!beyond_data){
     Result <- data.frame(Prediction=as.data.frame(as.numeric(prediction)),
@@ -462,46 +466,26 @@ clickstream.h2o.buildandtest <- function(data, # the feed dataset
     Result <- data.frame(Prediction=as.data.frame(as.numeric(prediction)),
                          Real=NA) # store predictions and real values in a data frame
   
-  return(list(Result=Result,Model=model,Int=test))
+  return(list(Result=Result,Model=model,Int=test,Indices=indices,ResponseColumn=response.col))
 }
 
 
-# FURTHER CHECK THE FUNCTIONS !!
-# clickstream.h2o.plotresult <- function(data,
-#                                        dates,
-#                                        title = "Prediction",
-#                                        subtitle = "", # to give model info
-#                                        beyond_data = FALSE,
-#                                        filename = NULL # name of the file if wanted to save, should be with ".html" extension
-# ){
-#   library(highcharter)
-#   if(!beyond_data){
-#     hc <- highchart() %>% 
-#       hc_title(text = title) %>% 
-#       hc_subtitle(text = subtitle) %>% 
-#       hc_add_series_times_values(dates = dates,values = data$predict, id = "Prediction",name = "Prediction") %>% 
-#       hc_add_series_times_values(dates = dates,values = data$Real, id = "Observed",name = "Observed")
-#   }
-#   else{
-#     hc <- highchart() %>% 
-#       hc_title(text = title) %>% 
-#       hc_subtitle(text = subtitle) %>% 
-#       hc_add_series_times_values(dates = dates,values = data$predict, id = "Prediction",name = "Prediction")
-#   }
-#   
-#   if(!is.null(filename))
-#     htmlwidgets::saveWidget(hc,filename)
-#   return(hc)
-# }
+## data_aslist is the output of the clickstream.h2o.buildandtest function!!
 clickstream.h2o.plotresult <- function(data_aslist,
                                        # data,
-                                       dates,
+                                       # dates,
                                        title = "Prediction",
                                        subtitle = "", # to give model info
-                                       beyond_data = FALSE,
+                                       datetime.cols = 9:13, # check at each different run!
+                                       # beyond_data = FALSE,
                                        filename = NULL # name of the file if wanted to save, should be with ".html" extension
 ){
   library(highcharter)
+  
+  temp.dates <- merge.datetime.mins(as.data.frame(data_aslist$Int)[,datetime.cols]) # get dates for x axis
+  dates <- temp.dates
+  # beyond_data <- all(is.na(as.data.frame(temp$Int)[,data_aslist$ResponseColumn])) # wheter forecasting beyond the data or not
+  beyond_data <- all(is.na(data_aslist$Result[,2])) # wheter forecasting beyond the data or not
   
   algorithm <- data_aslist$Model@algorithm
   switch(algorithm,
@@ -528,12 +512,6 @@ clickstream.h2o.plotresult <- function(data_aslist,
                                       "Sample Rate:",data_aslist$Model@allparameters$sample_rate,"<br>")})
   
   if(!beyond_data){
-    # hc <- highchart() %>% 
-    #   hc_title(text = title) %>% 
-    #   hc_subtitle(text = subtitle) %>% 
-    #   hc_add_series_times_values(dates = dates,values = data_aslist$Result$predict, id = "Prediction",name = "Prediction") %>% 
-    #   hc_add_series_times_values(dates = dates,values = data_aslist$Result$Real, id = "Observed",name = "Observed")
-    
     hc <- highchart() %>% 
       hc_title(text = title) %>%  # rearrange the title and subtitle !!!!
       hc_subtitle(text = subtitle) %>% 
@@ -559,7 +537,6 @@ clickstream.h2o.plotresult <- function(data_aslist,
     htmlwidgets::saveWidget(hc,filename)
   return(hc)
 }
-
 
 
 clickstream.simlist <- function(xdata,                # first data frame, considered as x
@@ -655,7 +632,9 @@ clickstream.h2o.gridBuildandtest <- function(data, # the feed dataset
                                              algorithm = "deeplearning",
                                              beyond_data=FALSE, # compare
                                              interpolation.step = NULL,
+                                             remove_negatives = TRUE,
                                              nthreads = -1,
+                                             min_mem_size = "6G",
                                              plot = FALSE,
                                              errorinfo = FALSE,
                                              sort_by = "mse",
@@ -671,7 +650,7 @@ clickstream.h2o.gridBuildandtest <- function(data, # the feed dataset
                                              ...
 ){
   library(h2o)
-  h2o.init(nthreads = nthreads,min_mem_size = "6G")
+  h2o.init(nthreads = nthreads,min_mem_size = min_mem_size)
   h2o.removeAll()
   
   if(!is.null(interpolation.step)){ # apply interpolation
@@ -743,7 +722,9 @@ clickstream.h2o.gridBuildandtest <- function(data, # the feed dataset
       current_model <- h2o.getModel(models.sorted@model_ids[[i]]) # get current model
       models.applied[[i]] <- current_model
       pred <- h2o.predict(object = current_model,newdata = test) # make predictions
-      res <- data.frame(predict = as.data.frame(pred),Real = as.data.frame(test[,response])) # store in a df
+      pred <- as.data.frame(pred)
+      if(remove_negatives) pred[which(pred[,1]<0),] <- 0
+      res <- data.frame(predict = pred,Real = as.data.frame(test[,response])) # store in a df
       print(res)
       Result[[i]] <- res
       # display error info
@@ -760,11 +741,13 @@ clickstream.h2o.gridBuildandtest <- function(data, # the feed dataset
     }
   }
   else{
-    for(i in 1:length(models.sorted)){
+    for(i in 1:length(models.sorted@model_ids)){
       current_model <- h2o.getModel(models.sorted@model_ids[[i]]) # get current model
       models.applied[[i]] <- current_model
       pred <- h2o.predict(object = current_model,newdata = test) # make predictions
-      res <- data.frame(predict = as.data.frame(pred),Real = NA) # store in a df
+      pred <- as.data.frame(pred)
+      if(remove_negatives) pred[which(pred[,1]<0),] <- 0
+      res <- data.frame(predict = pred,Real = NA) # store in a df
       print(res)
       Result[[i]] <- res
       specs[i,] <- NA # no errors calculation at all since there is no data to compare
@@ -772,6 +755,7 @@ clickstream.h2o.gridBuildandtest <- function(data, # the feed dataset
   }
   colnames(specs) <- c("rms","rmsPerEl.","percRmsPerEl.","cor","whole_err","el.wise_err")
   print(length(models.sorted@model_ids))
+  cat("\nTotal",length(models.sorted@model_ids),"models are generated.\n")
   return(list(Result=Result,Model=models.applied,Int=as.data.frame(test),Specs=specs,Indices=indices,ResponseColumn=response.col))
 }
 
@@ -792,7 +776,8 @@ clickstream.h2o.plotGrid <- function(grid.models, # output of the function click
   temp.dates <- merge.datetime.mins(as.data.frame(grid.models$Int)[,datetime.cols])
   print(temp.dates)
   
-  beyond_data <- all(is.na(as.data.frame(temp$Int)[,grid.models$ResponseColumn])) # wheter forecasting beyond the data or not
+  # beyond_data <- all(is.na(as.data.frame(temp$Int)[,grid.models$ResponseColumn])) # wheter forecasting beyond the data or not
+  beyond_data <- all(is.na(grid.models$Result[[1]][,2])) # wheter forecasting beyond the data or not
   
   plots <- list()
   for(i in seq(include)){
@@ -857,15 +842,152 @@ clickstream.h2o.plotGrid <- function(grid.models, # output of the function click
   }
   
   # fix nomenclature
-  cat("Top 10 among",length(gbm.sorted.grid@model_ids),algo_name$abb,"models were plotted.\n")
+  cat("Top 10 among",length(grid.models$Model),algo_name$abb,"models were plotted.\n")
   canv <- hw_grid(plots,ncol = 2,rowheight = 400) # make a canvas of plots
   
   htmltools::save_html(canv,paste(plot_output_prefix,algo_name$prefix,ID,".html",sep = ""))
   webshot::webshot(url = paste(plot_output_prefix,algo_name$prefix,ID,".html",sep = ""),
                    file = paste(plot_output_prefix,algo_name$prefix,ID,".png",sep = ""),vwidth = 1200)
-  cat("The canvas",plot_output_prefix,algo_name$prefix,ID,"is saved to",getwd(),"\n")
+  cat("The canvas ",plot_output_prefix,algo_name$prefix,ID," is saved to ",getwd(),"\n",sep = "")
   
-  return(canv)
+  return(list(canvas=canv,plots=plots))
+}
+
+
+
+clickstream.h2o.plotGridstack <- function(grid.models, # output of the function clickstream.h2o.gridBuiltandtest
+                                          plot_output_prefix, # final output file's name prefix
+                                          title_prefix, ## beginning of each plot title
+                                          subtitle_prefix, ## beginning of each plot subtitle
+                                          include = 10, # include first 10 elements (default)
+                                          type = "stock",
+                                          datetime.cols = 6:10
+){
+  
+  require(highcharter)
+  require(magrittr)
+  
+  # get the dates
+  temp.dates <- merge.datetime.mins(as.data.frame(grid.models$Int)[,datetime.cols])
+  print(temp.dates)
+  
+  beyond_data <- all(is.na(grid.models$Result[[1]][,2])) # whether forecasting beyond the data or not
+  
+  algorithm <- grid.models$Model[[1]]@algorithm
+  switch(algorithm,
+         "deeplearning" = {algo_name <- list(full="Artificial Neural Networks",abb="ANN",prefix="_ann_")},
+         
+         "drf" = {algo_name <- list(full="Random Forests",abb="RF",prefix="_rf_")},
+         
+         "gbm" = {algo_name <- list(full="Gradient Boost Machines",abb="GBM",prefix="_gbm_")})
+  # print("I pass switch")
+  if(include==10){
+    if(!beyond_data){
+      we_mean <- mean(grid.models$Specs$whole_err[1:10])
+      ee_mean <- mean(pred_grid_ann$Specs$el.wise_err[1:10])
+      
+      hc <- highchart(type = type) %>% 
+        hc_title(text = paste(title_prefix,"with",algo_name$full)) %>%  # rearrange the title and subtitle !!!!
+        hc_subtitle(text = paste(subtitle_prefix," Results of the optimization process, ",algo_name$abb," Model ",i,". Error on total: ",we_mean,
+                                 "%, Average of elementwise errors:",ee_mean,"%, errors are calculated as averages.",sep = "")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[1]][,1], id = paste(algo_name$abb,"Model 1"),name = paste(algo_name$abb,"Model 1")) %>% 
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[2]][,1], id = paste(algo_name$abb,"Model 2"),name = paste(algo_name$abb,"Model 2")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[3]][,1], id = paste(algo_name$abb,"Model 3"),name = paste(algo_name$abb,"Model 3")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[4]][,1], id = paste(algo_name$abb,"Model 4"),name = paste(algo_name$abb,"Model 4")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[5]][,1], id = paste(algo_name$abb,"Model 5"),name = paste(algo_name$abb,"Model 5")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[6]][,1], id = paste(algo_name$abb,"Model 6"),name = paste(algo_name$abb,"Model 6")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[7]][,1], id = paste(algo_name$abb,"Model 7"),name = paste(algo_name$abb,"Model 7")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[8]][,1], id = paste(algo_name$abb,"Model 8"),name = paste(algo_name$abb,"Model 8")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[9]][,1], id = paste(algo_name$abb,"Model 9"),name = paste(algo_name$abb,"Model 9")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[10]][,1], id = paste(algo_name$abb,"Model 10"),name = paste(algo_name$abb,"Model 10")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[1]][,2], id = "Observed",name = "Observed")# %>%
+    }
+    else{
+      hc <- highchart(type = type) %>% 
+        hc_title(text = paste(title_prefix,"with",algo_name$full)) %>%  # rearrange the title and subtitle !!!!
+        hc_subtitle(text = paste(subtitle_prefix,"Results of the optimization process, ",algo_name$abb," Model ",i,".",sep = "")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[1]][,1], id = paste(algo_name$abb,"Model 1"),name = paste(algo_name$abb,"Model 1")) %>% 
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[2]][,1], id = paste(algo_name$abb,"Model 2"),name = paste(algo_name$abb,"Model 2")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[3]][,1], id = paste(algo_name$abb,"Model 3"),name = paste(algo_name$abb,"Model 3")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[4]][,1], id = paste(algo_name$abb,"Model 4"),name = paste(algo_name$abb,"Model 4")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[5]][,1], id = paste(algo_name$abb,"Model 5"),name = paste(algo_name$abb,"Model 5")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[6]][,1], id = paste(algo_name$abb,"Model 6"),name = paste(algo_name$abb,"Model 6")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[7]][,1], id = paste(algo_name$abb,"Model 7"),name = paste(algo_name$abb,"Model 7")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[8]][,1], id = paste(algo_name$abb,"Model 8"),name = paste(algo_name$abb,"Model 8")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[9]][,1], id = paste(algo_name$abb,"Model 9"),name = paste(algo_name$abb,"Model 9")) %>%
+        hc_add_series_times_values(dates = temp.dates,values = grid.models$Result[[10]][,1], id = paste(algo_name$abb,"Model 10"),name = paste(algo_name$abb,"Model 10"))# %>%
+    }
+  }
+  
+  temp <- dplyr::bind_cols(grid.models$Result)[,seq(2*include)] # get first 10 predictions
+  ind <- apply(temp,2,function(x) all(!is.na(x))) # NA's excluded
+  temp <- temp[,ind]
+  
+  avs <- apply(temp,1,mean) %>% round(2) # average
+  
+  mydata <- data.frame(date = datetime_to_timestamp(temp.dates),
+                       low = apply(temp,1,min) %>% round(2),
+                       high = apply(temp,1,max) %>% round(2)) %>% list_parse2()
+  
+  hc_area <- highchart(type = type) %>% 
+    hc_title(text = paste(title_prefix,"with",algo_name$full)) %>%  # rearrange the title and subtitle !!!!
+    hc_subtitle(text = paste(subtitle_prefix,"Results of the optimization process, ",algo_name$abb," Model ",i,".",sep = "")) %>%
+    hc_add_series(data = mydata,type = "arearange",name = "band",id = "band") %>%
+    hc_add_series_times_values(dates = temp.dates,values = avs, id = "ave",name = "ave")
+  
+  return(list(stack=hc,interval=hc_area))
+}
+
+
+## a heatmap generator especially good for correlations
+hchart.cor <- function(object, ...) {
+  library(highcharter)
+  library(tidyr)
+  library(dplyr)
+  df <- as.data.frame(object)
+  is.num <- sapply(df, is.numeric)
+  df[is.num] <- lapply(df[is.num], round, 2)
+  dist <- NULL
+  
+  x <- y <- names(df)
+  
+  df <- tbl_df(cbind(x = y, df)) %>% 
+    gather(y, dist, -x) %>% 
+    mutate(x = as.character(x),
+           y = as.character(y)) %>% 
+    left_join(data_frame(x = y,
+                         xid = seq(length(y)) - 1), by = "x") %>% 
+    left_join(data_frame(y = y,
+                         yid = seq(length(y)) - 1), by = "y")
+  
+  ds <- df %>% 
+    select_("xid", "yid", "dist") %>% 
+    list.parse2()
+  
+  fntltp <- JS("function(){
+               return this.series.xAxis.categories[this.point.x] + ' ~ ' +
+               this.series.yAxis.categories[this.point.y] + ': <b>' +
+               Highcharts.numberFormat(this.point.value, 2)+'</b>';
+               ; }")
+  cor_colr <- list( list(0, '#FF5733'),
+                    list(0.5, '#F8F5F5'),
+                    list(1, '#2E86C1')
+  )
+  highchart() %>% 
+    hc_chart(type = "heatmap") %>% 
+    hc_xAxis(categories = y, title = NULL) %>% 
+    hc_yAxis(categories = y, title = NULL) %>% 
+    hc_add_series(data = ds) %>% 
+    hc_plotOptions(
+      series = list(
+        boderWidth = 0,
+        dataLabels = list(enabled = TRUE)
+      )) %>% 
+    hc_tooltip(formatter = fntltp) %>% 
+    hc_legend(align = "right", layout = "vertical",
+              margin = 0, verticalAlign = "top",
+              y = 25, symbolHeight = 280) %>% 
+    hc_colorAxis(  stops= cor_colr,min=-1,max=1)
 }
 
 
@@ -883,13 +1005,15 @@ clickstream <- list(import = clickstream.import,
                     h2o.plotresult = clickstream.h2o.plotresult,
                     h2o.gridBuildandtest = clickstream.h2o.gridBuildandtest,
                     h2o.plotGrid = clickstream.h2o.plotGrid,
+                    h2o.plotGridstack = clickstream.h2o.plotGridstack,
                     simlist = clickstream.simlist,
                     merge.datetime.mins = merge.datetime.mins,
                     perc.error = perc.error,
                     hidden.toStr = hidden.toStr,
                     split.Datetime = split.Datetime,
                     holidays.2017 = holidays.2017,
-                    rms = rms
+                    rms = rms,
+                    hchart.cor = hchart.cor
                     )
 
 

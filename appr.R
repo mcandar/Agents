@@ -25,7 +25,8 @@ if(!("dtw" %in% rownames(installed.packages()))) install.packages("dtw")
 if(!("highcharter" %in% rownames(installed.packages()))) install.packages("highcharter")
 if(!("h2o" %in% rownames(installed.packages()))) install.packages("h2o") # requires source files, www.h2o.ai/download/
 if(!("webshot" %in% rownames(installed.packages()))) install.packages("webshot")
-if(!("RPostgreSQL" %in% rownames(installed.packages()))) install.packages("RPostgreSQL")
+if(Sys.info()[1] == "Windows") # there are prerequisties in linux, but could directly be installed to windows
+  if(!("RPostgreSQL" %in% rownames(installed.packages()))) install.packages("RPostgreSQL") # fails in linux
 
 # Get zip information from github, for mapping purposes
 GetZips <- function(){

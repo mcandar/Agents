@@ -2481,6 +2481,34 @@ h2o.buildandtest2 <- function(data, # the feed dataset
 ### ------------------------------------------------- ###
 ### ------------------------------------------------- ###    
                                    
+   
+## break into hourly, according to specified search vector e.g. could be used to get hourly sale count for each state
+## this version is far FASTER from the other
+sales.hourly.perElement <- function(raw_sale, # sale data (raw or arranged) for preferably one category
+                                    source, # the quantity which will be searched for
+                                    col.target,
+                                    force.sixmonths=FALSE){ # target column of the sale data which will be searched in
+  
+  # get the longest time interval
+  timerange <- range(raw_sale$ShippingDate)
+  timedf <- data.frame(hour=seq(from = as.POSIXct(timerange[1]),
+                                to = as.POSIXct(timerange[2]),by = "hour"),x=0)
+  print(timedf)
+  
+  output <- data.frame(time=timedf[,1],nrow = matrix(NA,nrow(timedf),ncol = length(source))) # initialize an output df
+  for(i in seq_along(source)){
+    raw_temp <- raw_sale[which(raw_sale[,col.target]==source[i]),c("ShippingDate","UnitsShipped")] # get the relevant part
+    
+    Sum <- aggregate(raw_temp$UnitsShipped,
+                     list(hour=cut(as.POSIXct(raw_temp$ShippingDate), "hour")),sum) # sum corresponding values
+    Sum$hour <- as.POSIXct(Sum$hour)
+    temp <- dplyr::right_join(Sum,timedf,by = "hour")[,2]
+    temp[which(is.na(temp))] <- 0
+    output[,i+1] <- temp
+  }
+  colnames(output) <- c("time",as.character(source))
+  return(output)
+}
     
 ### ----------------------------------------------------------------------- ###
 ### - Text File and Data Editor Functions --------------------------------- ###
